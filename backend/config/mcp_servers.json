@@ -1,0 +1,24 @@
+{
+  "servers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
+      "env": {},
+      "description": "文件系统操作"
+    },
+    "web_search": {
+      "command": "python",
+      "args": ["-m", "mcp_server_web_search"],
+      "env": {
+        "SEARCH_API_KEY": "${SEARCH_API_KEY}"
+      },
+      "description": "网络搜索"
+    },
+    "sqlite": {
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "--db-path", "/workspace/data.db"],
+      "env": {},
+      "description": "SQLite 数据库"
+    }
+  }
+}

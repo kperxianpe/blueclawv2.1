@@ -1,0 +1,268 @@
+# -*- coding: utf-8 -*-
+"""
+KimiCode Service - KimiCode 会话与操作管理
+
+- 聊天会话管理
+- 代码生成/补全
+- Diff 生成/预览/应用
+- 与 ide/codemodel.py 集成
+"""
+import os
+import time
+import uuid
+from typing import Dict, List, Optional, Any, AsyncIterator
+
+from blueclaw.adapter.ide.models import (
+    KimiCodeChatMessage, KimiCodeChatRequest,
+    KimiCodeGenerateRequest, KimiCodeGenerateResponse,
+    KimiCodeInlineRequest, KimiCodeInlineResponse,
+    KimiCodeDiffRequest, KimiCodeDiffResponse, KimiCodeDiffPreviewResponse,
+    KimiCodeDiffApplyRequest, KimiCodeDiffApplyResponse,
+    KimiCodeSessionInfo, FileDiff,
+)
+from blueclaw.adapter.ide.codemodel import KimiCodeClient
+from blueclaw.adapter.ide.applier import IncrementApplier
+
+
+class KimiCodeService:
+    """KimiCode 服务"""
+
+    def __init__(self, api_key: Optional[str] = None, workspace_path: str = "."):
+        self.client = KimiCodeClient(api_key=api_key)
+        self.workspace_path = workspace_path
+        self._sessions: Dict[str, Dict[str, Any]] = {}
+        self._diffs: Dict[str, KimiCodeDiffResponse] = {}
+
+    def _get_or_create_session(self, session_id: Optional[str]) -> str:
+        if session_id and session_id in self._sessions:
+            return session_id
+        sid = f"kimi-{uuid.uuid4().hex[:8]}"
+        self._sessions[sid] = {
+            "created_at": time.time(),
+            "messages": [],
+            "context_files": {},
+        }
+        return sid
+
+    # ==================== Chat ====================
+
+    async def chat(self, req: KimiCodeChatRequest) -> AsyncIterator[str]:
+        """流式聊天，返回 SSE 格式的 chunk"""
+        sid = self._get_or_create_session(req.session_id)
+        session = self._sessions[sid]
+
+        # Build context-aware messages
+        system_msg = "You are an expert programming assistant. Help the user with code-related questions."
+        if req.context:
+            ctx_parts = []
+            af = req.context.get("active_file")
+            sc = req.context.get("selected_code")
+            if af:
+                ctx_parts.append(f"Active file: {af}")
+            if sc:
+                ctx_parts.append(f"Selected code:\n```\n{sc}\n```")
+            if ctx_parts:
+                system_msg += "\n\n" + "\n".join(ctx_parts)
+
+        messages = [{"role": "system", "content": system_msg}]
+        # Include history
+        for m in session["messages"]:
+            messages.append({"role": m.role, "content": m.content})
+        # Add current user messages
+        for m in req.messages:
+            messages.append({"role": m.role, "content": m.content})
+            session["messages"].append({"role": m.role, "content": m.content})
+
+        try:
+            response = await self.client.client.chat.completions.create(
+                model=self.client.model,
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2000,
+                stream=True,
+            )
+            full_content = ""
+            async for chunk in response:
+                delta = chunk.choices[0].delta.content or ""
+                full_content += delta
+                payload = json.dumps({"type": "chunk", "content": delta}, ensure_ascii=False)
+                yield f"data: {payload}\n\n"
+            session["messages"].append({"role": "assistant", "content": full_content})
+            payload = json.dumps({"type": "done", "session_id": sid, "full_content": full_content}, ensure_ascii=False)
+            yield f"data: {payload}\n\n"
+        except Exception as e:
+            payload = json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False)
+            yield f"data: {payload}\n\n"
+
+    # ==================== Generate ====================
+
+    async def generate(self, req: KimiCodeGenerateRequest) -> KimiCodeGenerateResponse:
+        """生成完整代码块"""
+        prompt = f"""Write {req.language or 'code'} based on the following request.
+
+Request: {req.prompt}
+
+{self._format_context_files(req.context_files)}
+
+Respond ONLY with the raw code. No markdown fences. No explanation outside code comments.
+"""
+        try:
+            response = await self.client.client.chat.completions.create(
+                model=self.client.model,
+                messages=[
+                    {"role": "system", "content": "You are an expert developer."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.2,
+                max_tokens=3000,
+            )
+            code = response.choices[0].message.content or ""
+            code = code.replace("```python", "").replace("```js", "").replace("```javascript", "")
+            code = code.replace("```typescript", "").replace("```ts", "").replace("```java", "")
+            code = code.replace("```html", "").replace("```css", "").replace("```", "").strip()
+
+            return KimiCodeGenerateResponse(
+                code=code,
+                language=req.language or "",
+                explanation="Generated by KimiCode",
+                tokens_used=response.usage.total_tokens if response.usage else 0,
+            )
+        except Exception as e:
+            return KimiCodeGenerateResponse(code="", language="", explanation=f"Error: {e}", tokens_used=0)
+
+    # ==================== Inline Completion ====================
+
+    async def inline_complete(self, req: KimiCodeInlineRequest) -> KimiCodeInlineResponse:
+        """Copilot 式内联补全"""
+        prompt = f"""Complete the code at the cursor position.
+
+File: {req.path}
+Language: {req.language or 'unknown'}
+
+Before cursor:
+```
+{req.prefix}
+```
+
+After cursor:
+```
+{req.suffix}
+```
+
+Provide ONLY the code that should be inserted at the cursor. No explanation.
+"""
+        try:
+            response = await self.client.client.chat.completions.create(
+                model=self.client.model,
+                messages=[
+                    {"role": "system", "content": "You are a code completion engine."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.1,
+                max_tokens=500,
+            )
+            completion = response.choices[0].message.content or ""
+            completion = completion.replace("```", "").strip()
+            return KimiCodeInlineResponse(completion=completion, confidence=0.85, tokens_used=response.usage.total_tokens if response.usage else 0)
+        except Exception as e:
+            return KimiCodeInlineResponse(completion="", confidence=0.0, tokens_used=0)
+
+    # ==================== Diff ====================
+
+    async def generate_diff(self, req: KimiCodeDiffRequest) -> KimiCodeDiffResponse:
+        """生成修改 diff"""
+        prompt = f"""Modify the code according to the request. Provide the changes as a unified diff.
+
+Request: {req.prompt}
+
+{self._format_context_files(req.context_files)}
+
+Respond with a unified diff in standard format:
+--- a/filepath
++++ b/filepath
+@@ -start,count +start,count @@
+ ...
+"""
+        try:
+            response = await self.client.client.chat.completions.create(
+                model=self.client.model,
+                messages=[
+                    {"role": "system", "content": "You are a code refactoring assistant. Respond only with unified diff."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.2,
+                max_tokens=3000,
+            )
+            diff_text = response.choices[0].message.content or ""
+            diffs = self.client.parse_unified_diff(diff_text)
+            diff_id = f"diff-{uuid.uuid4().hex[:8]}"
+            result = KimiCodeDiffResponse(diff_id=diff_id, diffs=diffs, explanation="Diff generated by KimiCode")
+            self._diffs[diff_id] = result
+            return result
+        except Exception as e:
+            return KimiCodeDiffResponse(diff_id="", diffs=[], explanation=f"Error: {e}")
+
+    def preview_diff(self, diff_id: str) -> KimiCodeDiffPreviewResponse:
+        """预览 diff（不写入文件）"""
+        diff_resp = self._diffs.get(diff_id)
+        if not diff_resp:
+            return KimiCodeDiffPreviewResponse(diff_id=diff_id, preview={})
+
+        preview: Dict[str, Dict[str, str]] = {}
+        for fd in diff_resp.diffs:
+            old_content = ""
+            new_content = ""
+            abs_path = os.path.join(self.workspace_path, fd.file_path)
+            if os.path.exists(abs_path):
+                with open(abs_path, "r", encoding="utf-8") as f:
+                    old_content = f.read()
+
+            # Simple preview: show old vs new markers
+            new_content = old_content  # TODO: apply hunks for accurate preview
+            preview[fd.file_path] = {"old": old_content, "new": new_content}
+
+        return KimiCodeDiffPreviewResponse(diff_id=diff_id, preview=preview)
+
+    def apply_diff(self, req: KimiCodeDiffApplyRequest) -> KimiCodeDiffApplyResponse:
+        """应用 diff 到文件系统"""
+        diff_resp = self._diffs.get(req.diff_id)
+        if not diff_resp:
+            return KimiCodeDiffApplyResponse(success=False, error="Diff not found")
+
+        try:
+            applier = IncrementApplier(project_path=self.workspace_path)
+            result = applier.apply_diffs(diff_resp.diffs, auto_commit=False)
+            return KimiCodeDiffApplyResponse(
+                success=result.success,
+                applied_files=result.files_changed,
+                error=result.error,
+            )
+        except Exception as e:
+            return KimiCodeDiffApplyResponse(success=False, error=str(e))
+
+    def discard_diff(self, diff_id: str) -> bool:
+        """丢弃 diff"""
+        return self._diffs.pop(diff_id, None) is not None
+
+    def list_sessions(self) -> List[KimiCodeSessionInfo]:
+        """列出所有会话"""
+        result = []
+        for sid, data in self._sessions.items():
+            result.append(KimiCodeSessionInfo(
+                session_id=sid,
+                created_at=data["created_at"],
+                message_count=len(data.get("messages", [])),
+                context_file_count=len(data.get("context_files", {})),
+            ))
+        return result
+
+    # ==================== Helpers ====================
+
+    @staticmethod
+    def _format_context_files(context_files: Dict[str, str]) -> str:
+        if not context_files:
+            return ""
+        parts = []
+        for path, content in context_files.items():
+            parts.append(f"--- File: {path} ---\n{content}\n")
+        return "\n".join(parts)
