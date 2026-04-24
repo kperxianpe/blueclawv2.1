@@ -1,0 +1,19 @@
+# Blueclaw v1.0 Requirements
+# Core
+# Development
+# mcp>=1.0.0
+# openai>=1.0.0
+# Optional - for browser automation
+# Optional - for LLM integration
+# playwright>=1.40.0
+# Week 20.5 - Async support
+# Week 20.5 - Docker Sandbox (optional)
+# Week 20.5 - MCP Protocol Support (optional)
+# 或从源码安装: pip install git+https://github.com/modelcontextprotocol/python-sdk.git
+anyio>=3.7.0
+asyncio>=3.4.3
+docker>=6.0.0
+httpx>=0.23.0
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+websockets>=12.0
