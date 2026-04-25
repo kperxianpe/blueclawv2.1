@@ -1,0 +1,47 @@
+{
+  "record_id": "rec_ceeb6a65",
+  "blueprint_id": "test-ide-001",
+  "step_id": "s1",
+  "step_type": "open_file",
+  "params": {},
+  "result": {
+    "status": "success",
+    "output": "Opened main.py",
+    "error": null,
+    "duration_ms": 0.0,
+    "needs_intervention": false
+  },
+  "before_screenshot": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+  "after_screenshot": "UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v02aAA=",
+  "timestamp": 1776541990.427316,
+  "state_snapshot": {
+    "adapter_type": "ide",
+    "project_path": "/tmp/project",
+    "active_file": "main.py",
+    "current_step_index": 0,
+    "remaining_steps": [
+      {
+        "step_id": "s1",
+        "name": "Open File",
+        "action": {
+          "type": "open_file",
+          "target": {
+            "semantic": "main.py",
+            "selector": null,
+            "coordinates": null
+          },
+          "params": {}
+        },
+        "dependencies": [],
+        "validation": null
+      }
+    ],
+    "config": {
+      "headless": true,
+      "timeout": 30,
+      "extra": {}
+    }
+  },
+  "has_intervention": false,
+  "intervention_type": null
+}

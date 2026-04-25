@@ -1,0 +1,61 @@
+{
+  "record_id": "rec_29303177",
+  "blueprint_id": "test-web-001",
+  "step_id": "s1",
+  "step_type": "navigate",
+  "params": {},
+  "result": {
+    "status": "success",
+    "output": "Navigated to home",
+    "error": null,
+    "duration_ms": 0.0,
+    "needs_intervention": false
+  },
+  "before_screenshot": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+  "after_screenshot": "UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v02aAA=",
+  "timestamp": 1776367182.1766465,
+  "state_snapshot": {
+    "adapter_type": "web",
+    "url": "home",
+    "current_step_index": 0,
+    "remaining_steps": [
+      {
+        "step_id": "s1",
+        "name": "Navigate",
+        "action": {
+          "type": "navigate",
+          "target": {
+            "semantic": "home",
+            "selector": null,
+            "coordinates": null
+          },
+          "params": {}
+        },
+        "dependencies": [],
+        "validation": null
+      },
+      {
+        "step_id": "s2",
+        "name": "Click",
+        "action": {
+          "type": "click",
+          "target": {
+            "semantic": "button",
+            "selector": null,
+            "coordinates": null
+          },
+          "params": {}
+        },
+        "dependencies": [],
+        "validation": null
+      }
+    ],
+    "config": {
+      "headless": true,
+      "timeout": 10,
+      "extra": {}
+    }
+  },
+  "has_intervention": false,
+  "intervention_type": null
+}

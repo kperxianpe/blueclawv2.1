@@ -1,0 +1,27 @@
+
+> my-app@0.0.0 dev
+> vite
+
+
+  [32m[1mVITE[22m v7.3.0[39m  [2mready in [0m[1m453[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m02:35:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/BlueprintCanvas.tsx, /src/index.css[22m
+[2m02:41:40[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/BlueprintCanvas.tsx, /src/index.css[22m
+[2m02:48:35[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/BlueprintCanvas.tsx, /src/index.css[22m
+[2m02:49:06[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/BlueprintCanvas.tsx, /src/index.css[22m
+[2m02:49:36[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/BlueprintCanvas.tsx, /src/index.css[22m
+[2m03:01:14[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/components/BlueprintCanvas.tsx, /src/components/nodes/ThinkingNode.tsx, /src/components/nodes/SummaryNode.tsx, /src/components/panels/SettingsPanel.tsx, /src/components/nodes/ExecutionNode.tsx, /src/index.css[22m
+[2m04:33:44[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/index.css[22m
+[2m04:34:43[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/App.tsx, /src/components/BlueprintCanvas.tsx, /src/components/nodes/ThinkingNode.tsx, /src/components/nodes/SummaryNode.tsx, /src/components/panels/SettingsPanel.tsx, /src/components/nodes/ExecutionNode.tsx[22m
+[2m04:37:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/BlueprintCanvas.tsx, /src/index.css[22m
+[2m04:38:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/components/nodes/ThinkingNode.tsx[22m
+[2m04:39:02[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/components/nodes/ThinkingNode.tsx[22m
+[2m05:19:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/components/nodes/ThinkingNode.tsx[22m
+[2m05:21:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/components/BlueprintCanvas.tsx, /src/components/nodes/ThinkingNode.tsx, /src/components/nodes/SummaryNode.tsx, /src/components/panels/SettingsPanel.tsx, /src/components/nodes/ExecutionNode.tsx, /src/index.css[22m
+[2m05:22:44[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/components/BlueprintCanvas.tsx, /src/components/nodes/ThinkingNode.tsx, /src/components/nodes/SummaryNode.tsx, /src/components/panels/SettingsPanel.tsx, /src/components/nodes/ExecutionNode.tsx, /src/index.css[22m
+[2m07:05:44[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/components/BlueprintCanvas.tsx, /src/components/nodes/ThinkingNode.tsx, /src/components/nodes/SummaryNode.tsx, /src/components/panels/SettingsPanel.tsx, /src/components/nodes/ExecutionNode.tsx, /src/index.css[22m
+[2m09:42:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/App.tsx, /src/components/BlueprintCanvas.tsx, /src/components/nodes/ThinkingNode.tsx, /src/components/nodes/SummaryNode.tsx, /src/components/panels/SettingsPanel.tsx, /src/components/nodes/ExecutionNode.tsx[22m
+[2m09:43:37[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdist/index.html[22m
+[2m09:43:38[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdist/index.html[22m
