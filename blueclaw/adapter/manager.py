@@ -126,6 +126,23 @@ class AdapterManager:
         import base64
         return base64.b64encode(raw).decode("utf-8")
 
+    async def html_snapshot(self, task_id: str) -> Dict[str, str]:
+        """获取指定任务的当前页面 HTML 快照（含 url/title）"""
+        adapter_type = self._task_adapter_map.get(task_id)
+        if not adapter_type:
+            return {"html": "", "url": "", "title": ""}
+        adapter = self._adapters.get(adapter_type)
+        if not adapter or not hasattr(adapter, '_page') or adapter._page is None:
+            return {"html": "", "url": "", "title": ""}
+        try:
+            page = adapter._page
+            html = await page.content()
+            url = page.url
+            title = await page.title()
+            return {"html": html, "url": url, "title": title}
+        except Exception:
+            return {"html": "", "url": "", "title": ""}
+
     @staticmethod
     def from_core_blueprint(core_blueprint: Dict) -> ExecutionBlueprint:
         """将 Core 层 dataclass/dict 转换为 Adapter 层 Pydantic 模型"""

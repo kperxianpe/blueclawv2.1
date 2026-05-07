@@ -38,7 +38,7 @@ const nodeTypes: NodeTypes = {
   summary: SummaryNodeComponent as unknown as NodeTypes['summary'],
 };
 
-export function BlueprintCanvas() {
+export function BlueprintCanvas({ apiKey, onApiKeyChange }: { apiKey: string; onApiKeyChange: (key: string) => void }) {
   const store = useBlueprintStore();
   const thinkingFlowRef = useRef<ReactFlowInstance | null>(null);
   const execFlowRef = useRef<ReactFlowInstance | null>(null);
@@ -64,6 +64,7 @@ export function BlueprintCanvas() {
     setShowConfirmExecution,
     freeze,
     clearFreeze,
+    selectedThinkingNodeId,
   } = store;
 
   const [thinkingNodesState, setThinkingNodes, onThinkingNodesChange] = useNodesState<Node>([]);
@@ -129,6 +130,22 @@ export function BlueprintCanvas() {
     setThinkingNodes(newNodes);
     setThinkingEdges(newEdges);
   }, [thinkingNodes, setThinkingNodes, setThinkingEdges, canvasConfig.thinkingNodeSpacing]);
+
+  // 自动定位到新选中的 thinking 节点 — 精确聚焦到节点中央
+  useEffect(() => {
+    if (selectedThinkingNodeId && thinkingFlowRef.current) {
+      setTimeout(() => {
+        const instance = thinkingFlowRef.current;
+        if (!instance) return;
+        const node = thinkingNodes.find(n => n.id === selectedThinkingNodeId);
+        if (!node) return;
+        // 计算节点位置（垂直排列，x=220, y=60 + index * spacing）
+        const nodeIndex = thinkingNodes.findIndex(n => n.id === selectedThinkingNodeId);
+        const targetY = 60 + nodeIndex * canvasConfig.thinkingNodeSpacing + 60; // +60 让节点在视口中央偏上
+        instance.setCenter(220 + 110, targetY, { duration: 400, zoom: 1.0 });
+      }, 150);
+    }
+  }, [selectedThinkingNodeId, thinkingNodes, canvasConfig.thinkingNodeSpacing]);
 
   // Generate execution canvas nodes (右侧) - 支持支路连线
   useEffect(() => {
@@ -295,13 +312,21 @@ export function BlueprintCanvas() {
     setShowConfirmExecution(false);
   }, [isConnected, send, currentTaskId, setIsGeneratingBlueprint, setShowConfirmExecution]);
 
-  const handleInputSubmit = useCallback((input: string) => {
+  const handleInputSubmit = useCallback((input: string, key?: string) => {
     setUserInput(input);
     setWsError(null);
     
     if (isConnected) {
-      // 真实后端模式 - 发送消息
-      const sent = send('task.start', { user_input: input });
+      // 真实后端模式 - 发送消息，携带 API Key 和 auto_select
+      const payload: Record<string, any> = { user_input: input };
+      if (key && key.trim()) {
+        payload.api_key = key.trim();
+      }
+      // 从 store 读取 auto_select 设置
+      const { autoSelect } = useBlueprintStore.getState();
+      payload.auto_select = autoSelect;
+      
+      const sent = send('task.start', payload);
       if (!sent) {
         setWsError('无法发送任务到后端，连接可能已断开。请检查 WebSocket 服务是否正常运行。');
       }
@@ -313,13 +338,29 @@ export function BlueprintCanvas() {
   const handleExecAction = useCallback((action: 'continue' | 'newBranch' | 'stop', customInput?: string) => {
     const state = useBlueprintStore.getState();
     if (state.isRealtimeMode && state.currentTaskId && state.currentBlueprintId && state.interventionStepId) {
-      if (action === 'newBranch') {
+      if (action === 'continue') {
+        // 继续执行 = 跳过当前步骤，继续后续执行
+        send('execution.intervene', {
+          task_id: state.currentTaskId,
+          blueprint_id: state.currentBlueprintId,
+          step_id: state.interventionStepId,
+          action: 'skip',
+          custom_input: '',
+        });
+      } else if (action === 'newBranch') {
+        // 重新规划 = 返回思考阶段重新生成选项
         send('execution.intervene', {
           task_id: state.currentTaskId,
           blueprint_id: state.currentBlueprintId,
           step_id: state.interventionStepId,
           action: 'replan',
           custom_input: customInput || '',
+        });
+      } else if (action === 'stop') {
+        // 完全停止 = 取消蓝图执行（包括解冻冻结状态）
+        send('execution.cancel', {
+          task_id: state.currentTaskId,
+          blueprint_id: state.currentBlueprintId,
         });
       }
     }

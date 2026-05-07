@@ -81,7 +81,7 @@ export const defaultCanvasConfig: CanvasConfig = {
   executionCanvasZoom: 1,
   canvasBackground: 'gradient',
   backgroundColor: '#0f172a',
-  thinkingNodeSpacing: 180,
+  thinkingNodeSpacing: 260,
   executionNodeSpacing: 140,
 };
 
@@ -102,9 +102,10 @@ export interface BlueprintState {
   currentTaskId: string | null;
   currentBlueprintId: string | null;
   
-  // 冻结 / 截图 / 标注
+  // 冻结 / 截图 / 标注 / HTML 快照
   freeze: FreezeState;
   screenshots: { stepId: string; image: string; timestamp: number }[];
+  htmlSnapshots: { stepId: string; html: string; url: string; title: string; timestamp: number }[];
   
   setUserInput: (input: string) => void;
   startThinking: () => void;
@@ -119,6 +120,10 @@ export interface BlueprintState {
   handleIntervention: (action: 'continue' | 'newBranch' | 'stop', customInput?: string) => void;
   hideIntervention: () => void;
   reset: () => void;
+  
+  // Auto-select 开关
+  autoSelect: boolean;
+  setAutoSelect: (value: boolean) => void;
   
   // 画布配置
   canvasConfig: CanvasConfig;
@@ -140,6 +145,7 @@ export interface BlueprintState {
   // 冻结 / 截图 / 标注
   setFreezeState: (state: Partial<FreezeState>) => void;
   addScreenshot: (screenshot: { stepId: string; image: string; timestamp: number }) => void;
+  addHtmlSnapshot: (snapshot: { stepId: string; html: string; url: string; title: string; timestamp: number }) => void;
   clearScreenshots: () => void;
   clearFreeze: () => void;
 }

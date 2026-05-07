@@ -1,7 +1,7 @@
 # Blueclaw v2.5.0
 
 > Progressive AI Task Execution Engine -- From Thinking to Blueprint, From Execution to Intervention, Complete Closed Loop.
-
+[integration_test.json](..%2F..%2Fblueclawv2.1%2Fblueclawv2.1%2Fsessions%2Fadapter_state%2Fintegration_test.json)
 ## What's New in v2.5.0
 
 - **IDE Adapter Suite**: Full code modification pipeline with AST analysis (Python/JS/TS/Java), sandbox validation, and auto-apply with Git commit

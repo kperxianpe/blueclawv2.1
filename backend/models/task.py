@@ -36,6 +36,9 @@ class Task:
     current_step_id: Optional[str] = None
     context: Dict[str, Any] = field(default_factory=dict)
     
+    # 用户设置
+    auto_select: bool = True  # AI 自动选择后续选项
+    
     @classmethod
     def create(cls, user_input: str) -> "Task":
         now = time.time()

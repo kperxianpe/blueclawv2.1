@@ -10,6 +10,7 @@ Combines:
 """
 import asyncio
 import json
+import sys
 import uuid
 from typing import Dict, Set, Optional
 
@@ -17,6 +18,11 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Blueclaw v2.5 Unified Server")
+
+# ── Health check (for E2E ready probe) ─────────────────
+@app.get("/api/health")
+async def health_check():
+    return {"status": "ok", "version": "2.5"}
 
 # CORS for frontend dev server
 app.add_middleware(
@@ -58,11 +64,13 @@ class UnifiedServer:
             await self._cleanup_connection(websocket)
 
     async def _handle_message(self, websocket: WebSocket, message: str):
+        import sys
         try:
             data = json.loads(message)
             msg_type = data.get("type")
             payload = data.get("payload", {})
             print(f"[WS] Received: {msg_type}")
+            sys.stdout.flush()
 
             # Auto-associate task
             task_id = payload.get("task_id") if isinstance(payload, dict) else None

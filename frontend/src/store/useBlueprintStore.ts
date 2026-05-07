@@ -24,6 +24,10 @@ const initialState = {
   isGeneratingBlueprint: false,
   showConfirmExecution: false,
   
+  // Auto-select 开关
+  autoSelect: true,
+  setAutoSelect: (value: boolean) => set({ autoSelect: value }),
+  
   // 冻结 / 截图 / 标注
   freeze: {
     isFrozen: false,
@@ -33,6 +37,7 @@ const initialState = {
     annotations: [] as any[],
   },
   screenshots: [] as { stepId: string; image: string; timestamp: number }[],
+  htmlSnapshots: [] as { stepId: string; html: string; url: string; title: string; timestamp: number }[],
 };
 
 export const useBlueprintStore = create<BlueprintState & {
@@ -117,6 +122,26 @@ export const useBlueprintStore = create<BlueprintState & {
         selectedThinkingNodeId: nextNode.id,
       });
     }
+  },
+  
+  rethinkFromNode: (nodeId) => {
+    const { thinkingNodes } = get();
+    const nodeIndex = thinkingNodes.findIndex(n => n.id === nodeId);
+    if (nodeIndex === -1) return;
+    
+    // 截断到当前节点（包含），重置当前节点状态为 pending
+    const keptNodes = thinkingNodes.slice(0, nodeIndex + 1).map((node, idx) => {
+      if (idx === nodeIndex) {
+        return { ...node, status: 'pending' as const, selectedOption: undefined, customInput: undefined };
+      }
+      return node;
+    });
+    
+    set({
+      thinkingNodes: keptNodes,
+      currentThinkingIndex: nodeIndex,
+      selectedThinkingNodeId: nodeId,
+    });
   },
   
   setCustomInput: (nodeId, input) => {
@@ -409,6 +434,11 @@ export const useBlueprintStore = create<BlueprintState & {
   addScreenshot: (screenshot) => {
     set((prev) => ({
       screenshots: [...prev.screenshots, screenshot],
+    }));
+  },
+  addHtmlSnapshot: (snapshot) => {
+    set((prev) => ({
+      htmlSnapshots: [...prev.htmlSnapshots, snapshot],
     }));
   },
   clearScreenshots: () => set({ screenshots: [] }),

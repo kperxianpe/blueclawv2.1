@@ -20,7 +20,7 @@ class SearchSkill(BaseSkill):
     
     parameters = [
         SkillParameter("query", "string", "Search query", required=True),
-        SkillParameter("engine", "string", "Search engine", required=False, default="google"),
+        SkillParameter("engine", "string", "Search engine", required=False, default="bing"),
     ]
     
     def __init__(self, api_keys: Optional[Dict[str, str]] = None):
@@ -32,7 +32,7 @@ class SearchSkill(BaseSkill):
         if not query:
             return SkillResult.fail(error="Missing required parameter: query")
         
-        engine = kwargs.get('engine', 'google')
+        engine = kwargs.get('engine', 'bing')
         
         try:
             return await self._search_browser(query, engine)
@@ -53,7 +53,9 @@ class SearchSkill(BaseSkill):
             result = await browser.execute(action='navigate', url=url)
             
             if result.success:
-                extract_result = await browser.execute(action='extract', selector='h3')
+                # Bing 用 h2，Google 用 h3
+                selector = 'h2' if engine == 'bing' else 'h3'
+                extract_result = await browser.execute(action='extract', selector=selector)
                 if extract_result.success:
                     titles = extract_result.data if isinstance(extract_result.data, list) else []
                     results = [{'title': t} for t in titles[:10]]

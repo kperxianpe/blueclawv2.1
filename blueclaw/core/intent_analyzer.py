@@ -48,7 +48,7 @@ class IntentAnalyzer:
     
     # 问候语关键词
     GREETING_PATTERNS = [
-        r'你好', r'您好', r'哈喽', r'嗨', r'hello', r'hi', r'hey',
+        r'你好', r'您好', r'哈喽', r'嗨', r'hello', r'\bhi\b', r'hey',
         r'在吗', r'在么', r'在不在', r'有人吗'
     ]
     
@@ -185,6 +185,10 @@ class IntentAnalyzer:
         
         # 检查命令型
         if any(pattern.search(user_input) for pattern in self.command_patterns):
+            # 如果包含文件操作上下文，应识别为任务而非命令
+            file_context = any(p.search(user_input) for p in self.task_type_patterns.get(TaskType.FILE_OPERATION, []))
+            if file_context:
+                return IntentType.TASK
             return IntentType.COMMAND
         
         # 检查任务型
@@ -206,6 +210,11 @@ class IntentAnalyzer:
         if not scores:
             return TaskType.GENERAL
         
+        # 同分时优先返回 SEARCH
+        max_score = max(scores.values())
+        if scores.get(TaskType.SEARCH) == max_score and len([s for s in scores.values() if s == max_score]) > 1:
+            return TaskType.SEARCH
+        
         # 返回得分最高的任务类型
         return max(scores.items(), key=lambda x: x[1])[0]
     
@@ -222,7 +231,14 @@ class IntentAnalyzer:
         for pattern in location_patterns:
             match = re.search(pattern, user_input)
             if match:
-                entities['destination'] = match.group(1).strip()
+                dest = match.group(1).strip()
+                # 去除旅行相关后缀
+                travel_suffixes = ['旅行', '旅游', '之旅', '攻略', '游玩', '度假', '出行']
+                for suffix in travel_suffixes:
+                    if dest.endswith(suffix):
+                        dest = dest[:-len(suffix)]
+                        break
+                entities['destination'] = dest
                 break
         
         # 提取时间

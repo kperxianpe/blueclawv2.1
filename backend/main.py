@@ -39,7 +39,8 @@ def main():
     task_manager.set_server(unified_server)
     from websocket.message_router import router
     router.set_websocket_server(unified_server)
-    print("[Main] TaskManager and MessageRouter server references set")
+    from blueclaw.core.state_sync import state_sync
+    print(f"[Main] state_sync id: {id(state_sync)}, websocket_server: {state_sync.websocket_server is not None}")
 
     # 3. 启动统一服务（FastAPI HTTP + WebSocket）
     port = int(os.environ.get('PORT', 8006))

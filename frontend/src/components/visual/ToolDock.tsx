@@ -84,7 +84,7 @@ export function ToolDock({
   };
 
   return (
-    <div className="w-[60px] h-full bg-slate-800/90 border-x border-slate-700/50 flex flex-col z-10 shadow-xl">
+    <div className="w-[60px] h-full bg-slate-800/90 border-x border-slate-700/50 flex flex-col z-50 shadow-xl">
       {/* 顶部功能区 */}
       <div className="flex flex-col items-center py-3 gap-3 border-b border-slate-700/50">
         {/* 设置按钮 */}

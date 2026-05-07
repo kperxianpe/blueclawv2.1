@@ -76,12 +76,13 @@ class LLMClient:
         self._async_client: Optional[httpx.AsyncClient] = None
     
     def _get_api_key(self) -> str:
+        from blueclaw.config import Config
         if self.provider == ModelProvider.KIMI:
-            return os.getenv('KIMI_API_KEY', '')
+            return Config.KIMI_API_KEY or os.getenv('KIMI_API_KEY', '')
         elif self.provider == ModelProvider.OPENAI:
-            return os.getenv('OPENAI_API_KEY', '')
+            return Config.OPENAI_API_KEY or os.getenv('OPENAI_API_KEY', '')
         elif self.provider == ModelProvider.ANTHROPIC:
-            return os.getenv('ANTHROPIC_API_KEY', '')
+            return Config.ANTHROPIC_API_KEY or os.getenv('ANTHROPIC_API_KEY', '')
         return ''
     
     def _get_base_url(self) -> str:

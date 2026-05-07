@@ -217,23 +217,43 @@ class MessageRouter:
     async def _handle_task_start(self, websocket, payload: dict, server) -> dict:
         """Handler 1: 任务启动"""
         user_input = payload.get("user_input", "")
+        auto_select = payload.get("auto_select", True)
+        api_key = payload.get("api_key", "")
         
-        # 1. 创建任务
-        task = await task_manager.create_task(user_input)
+        # ===== API Key 处理 =====
+        if api_key and len(api_key) > 10:
+            from blueclaw.config import Config
+            Config.KIMI_API_KEY = api_key
+            print(f"[TaskStart] User-provided API key set (length={len(api_key)})")
         
-        # 2. 关联连接与任务
+        # 1. 创建任务（带上 auto_select 设置）
+        task = await task_manager.create_task(user_input, auto_select=auto_select)
+        
+        # 2. 把 auto_select 传给 thinking_engine
+        thinking_engine.set_task_auto_select(task.id, auto_select)
+        
+        # 3. 关联连接与任务
         server.associate_connection_with_task(websocket, task.id)
         
-        # 3. 创建 EngineFacade
+        # 4. 创建 EngineFacade
         facade = BlueclawEngineFacade(task.id)
         self.facades[task.id] = facade
         
-        # 4. 调用思考引擎开始思考
+        # 5. 调用思考引擎开始思考
         root_node = await thinking_engine.start_thinking(task.id, user_input)
         
-        # 5. 推送思考节点
+        # 6. 推送思考节点或收敛后的蓝图
         if root_node:
+            # print(f"[DEBUG router] Pushing thinking.node_created for task {task.id}, state_sync.server={state_sync.websocket_server is not None}")
+            import sys; sys.stdout.flush()
             await state_sync.push_thinking_node_created(task.id, root_node, is_root=True)
+            
+            # 如果节点已经收敛（auto_select 模式），自动生成蓝图
+            if thinking_engine.is_converged(task.id):
+                # print(f"[DEBUG router] Thinking converged, auto-generating blueprint")
+                sys.stdout.flush()
+                final_path = thinking_engine.get_thinking_path(task.id)
+                asyncio.create_task(self._auto_generate_blueprint(task.id, [n.to_dict() if hasattr(n, 'to_dict') else n for n in final_path]))
         
         return Message.task_started(task.id, user_input)
     
@@ -275,7 +295,7 @@ class MessageRouter:
         option_id = payload.get("option_id", "")
         current_node_id = payload.get("current_node_id", "")
         
-        print(f"[DEBUG router] select_option called: task={task_id}, node={current_node_id}, option={option_id}")
+        # print(f"[DEBUG router] select_option called: task={task_id}, node={current_node_id}, option={option_id}")
         
         if not task_id or not option_id:
             return {"type": "error", "error": "Missing task_id or option_id"}
@@ -286,7 +306,7 @@ class MessageRouter:
             node_id=current_node_id,
             option_id=option_id
         )
-        print(f"[DEBUG router] select_option result: has_more={result.get('has_more_options')}, converged={result.get('converged')}")
+        # print(f"[DEBUG router] select_option result: has_more={result.get('has_more_options')}, converged={result.get('converged')}")
         
         # 2. 保存checkpoint
         await checkpoint_manager.save_checkpoint(task_manager.get_task(task_id))
@@ -427,14 +447,20 @@ class MessageRouter:
         return {"type": "error", "error": "Missing blueprint_id"}
     
     async def _handle_execution_cancel(self, websocket, payload: dict, server) -> dict:
-        """取消指定蓝图的执行（测试/清理用）"""
+        """取消指定蓝图的执行（包括解冻冻结状态）"""
         task_id = payload.get("task_id", "")
         blueprint_id = payload.get("blueprint_id", "")
         
         if not blueprint_id:
             return {"type": "error", "error": "Missing blueprint_id"}
         
-        print(f"[ExecutionCancel] Cancelling execution for blueprint {blueprint_id}")
+        # 1. 如果蓝图处于 frozen 状态，先解冻再取消
+        runtime = adapter_runtime_manager.get(blueprint_id)
+        if runtime and runtime.state == "frozen":
+            adapter_runtime_manager.set_state(blueprint_id, "idle")
+            await adapter_runtime_manager.push_unfrozen(blueprint_id)
+        
+        # 2. 取消蓝图执行
         execution_engine.cancel_execution(blueprint_id)
         
         return {

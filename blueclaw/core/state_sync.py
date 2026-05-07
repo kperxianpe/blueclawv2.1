@@ -13,20 +13,23 @@ from datetime import datetime
 
 class StateSyncManager:
     """状态同步管理器"""
-    
+
     def __init__(self):
         self.websocket_server = None
-    
+
     def set_websocket_server(self, server):
         self.websocket_server = server
-    
+
     async def broadcast_to_task(self, task_id: str, message: dict):
         """广播消息到任务的所有连接"""
+        # print(f"[StateSync] broadcast_to_task: task={task_id}, type={message.get('type')}, server={self.websocket_server is not None}")
         if self.websocket_server:
             await self.websocket_server.broadcast_to_task(task_id, message)
-    
+        else:
+            pass  # websocket_server not set
+
     # ========== Thinking Phase ==========
-    
+
     async def push_thinking_node_created(self, task_id: str, node, is_root: bool = False):
         """推送思考节点创建"""
         await self.broadcast_to_task(task_id, {
@@ -48,7 +51,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_thinking_completed(self, task_id: str, final_path: List[dict]):
         """推送思考完成"""
         await self.broadcast_to_task(task_id, {
@@ -59,7 +62,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_thinking_converged(self, task_id: str, final_path: List[dict]):
         """推送思考收敛（ thinking → execution 自动过渡 ）"""
         await self.broadcast_to_task(task_id, {
@@ -72,9 +75,9 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     # ========== Execution Phase ==========
-    
+
     async def push_execution_blueprint_loaded(self, task_id: str, blueprint):
         """推送执行蓝图加载"""
         steps_data = []
@@ -91,7 +94,7 @@ class StateSyncManager:
                 "is_convergence": step.is_convergence if hasattr(step, 'is_convergence') else step.get('is_convergence', False),
                 "convergence_type": step.convergence_type if hasattr(step, 'convergence_type') else step.get('convergence_type'),
             })
-        
+
         await self.broadcast_to_task(task_id, {
             "type": "execution.blueprint_loaded",
             "payload": {
@@ -103,7 +106,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_execution_step_started(self, task_id: str, step):
         """推送步骤开始"""
         step_id = step.id if hasattr(step, 'id') else step.get('id')
@@ -120,7 +123,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_execution_step_completed(self, task_id: str, step):
         """推送步骤完成"""
         step_id = step.id if hasattr(step, 'id') else step.get('id')
@@ -137,7 +140,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_execution_step_failed(self, task_id: str, step, error_type: Optional[str] = None, stack_trace: Optional[str] = None):
         """推送步骤失败"""
         failed_count = step.failed_count if hasattr(step, 'failed_count') else step.get('failed_count', 0)
@@ -157,7 +160,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_execution_intervention_needed(self, task_id: str, step, blueprint):
         """推送需要干预"""
         await self.broadcast_to_task(task_id, {
@@ -176,7 +179,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_execution_returned_to_thinking(self, task_id: str, archived_step_ids: List[str]):
         """推送执行阶段返回到思考阶段"""
         await self.broadcast_to_task(task_id, {
@@ -187,7 +190,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_execution_replanned(self, task_id: str, from_step_id: str, abandoned_steps: List[str], new_steps: List[dict]):
         """推送 REPLAN 结果"""
         await self.broadcast_to_task(task_id, {
@@ -200,7 +203,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_execution_returned_to_thinking(self, task_id: str, archived_step_ids: List[str]):
         """推送执行阶段返回思考阶段"""
         await self.broadcast_to_task(task_id, {
@@ -211,13 +214,13 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_execution_completed(self, task_id: str, blueprint, execution_time: float = 0):
         """推送执行完成"""
         steps = blueprint.steps if hasattr(blueprint, 'steps') else blueprint.get('steps', [])
-        completed_count = sum(1 for s in steps 
+        completed_count = sum(1 for s in steps
                             if (s.status.value if hasattr(s, 'status') else s.get('status')) == "completed")
-        
+
         await self.broadcast_to_task(task_id, {
             "type": "execution.completed",
             "payload": {
@@ -231,7 +234,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_execution_paused(self, task_id: str, blueprint_id: str):
         """推送执行暂停"""
         await self.broadcast_to_task(task_id, {
@@ -242,7 +245,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_execution_resumed(self, task_id: str, blueprint_id: str):
         """推送执行恢复"""
         await self.broadcast_to_task(task_id, {
@@ -253,9 +256,9 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     # ========== Week 20 Vis-Adapter Methods ==========
-    
+
     async def push_visual_preview(
         self,
         task_id: str,
@@ -270,7 +273,7 @@ class StateSyncManager:
                 elements_data.append(elem.to_dict())
             else:
                 elements_data.append(elem)
-        
+
         await self.broadcast_to_task(task_id, {
             "type": "vis.preview",
             "payload": {
@@ -288,7 +291,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_visual_action_executed(self, task_id: str, action: str, result: dict):
         """推送视觉动作执行结果"""
         await self.broadcast_to_task(task_id, {
@@ -300,9 +303,9 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     # ========== Adapter / Intervention / Freeze Methods ==========
-    
+
     async def push_screenshot(self, task_id: str, step_id: str, image_b64: str, adapter_id: str = ""):
         """推送执行截图（Adapter 步骤执行时）"""
         await self.broadcast_to_task(task_id, {
@@ -316,7 +319,23 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
+    async def push_html_snapshot(self, task_id: str, step_id: str, html: str, url: str = "", title: str = "", adapter_id: str = ""):
+        """推送网页 HTML 快照（极简浏览器用）"""
+        await self.broadcast_to_task(task_id, {
+            "type": "html_snapshot",
+            "payload": {
+                "adapterId": adapter_id or task_id,
+                "stepId": step_id,
+                "html": html,
+                "url": url,
+                "title": title,
+                "timestamp": self._timestamp()
+            },
+            "timestamp": self._timestamp(),
+            "message_id": self._message_id()
+        })
+
     async def push_status_update(self, task_id: str, status_data: dict):
         """推送通用状态更新（含 requiresIntervention 等）"""
         await self.broadcast_to_task(task_id, {
@@ -329,7 +348,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_freeze_confirmed(self, task_id: str, step_id: str, screenshot_b64: str, freeze_token: str):
         """推送冻结确认"""
         await self.broadcast_to_task(task_id, {
@@ -343,7 +362,7 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     async def push_replan_result(self, task_id: str, accepted: bool, new_steps: List[dict] = None, reason: str = ""):
         """推送重新规划结果"""
         await self.broadcast_to_task(task_id, {
@@ -357,20 +376,20 @@ class StateSyncManager:
             "timestamp": self._timestamp(),
             "message_id": self._message_id()
         })
-    
+
     # ========== Utility Methods ==========
-    
+
     def _timestamp(self) -> int:
         return int(datetime.now().timestamp() * 1000)
-    
+
     def _message_id(self) -> str:
         import uuid
         return str(uuid.uuid4())
-    
+
     def _calculate_duration(self, step) -> int:
         started = step.started_at if hasattr(step, 'started_at') else step.get('started_at')
         completed = step.completed_at if hasattr(step, 'completed_at') else step.get('completed_at')
-        
+
         if started and completed:
             try:
                 start = datetime.fromisoformat(started)

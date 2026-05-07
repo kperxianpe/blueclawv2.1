@@ -21,7 +21,7 @@ export function generateThinkingNode(index: number, customQuestion?: string): Th
       { id: 'C', label: '休闲度假', description: '温泉、海滩、慢生活', confidence: 0.72 },
     ],
     [
-      { id: 'A', label: '杭州', description: '西湖、灵隐寺、龙井茶', confidence: 0.88, isDefault: true },
+      { id: 'A', label: '北京', description: '故宫、长城、天坛', confidence: 0.88, isDefault: true },
       { id: 'B', label: '苏州', description: '园林、古镇、小桥流水', confidence: 0.82 },
       { id: 'C', label: '黄山', description: '奇松、怪石、云海日出', confidence: 0.75 },
     ],

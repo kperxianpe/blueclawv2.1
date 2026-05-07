@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from typing import Optional, Dict, Any
+import asyncio
 
 from .base_skill import BaseSkill, SkillResult, SkillParameter, PermissionLevel
 
@@ -64,7 +65,10 @@ class BrowserSkill(BaseSkill):
             return SkillResult.fail(error="Missing URL")
         
         await self._init_browser()
-        response = await self._page.goto(url, wait_until='networkidle')
+        # 使用 domcontentloaded 而不是 networkidle，避免跟踪脚本卡住
+        response = await self._page.goto(url, wait_until='domcontentloaded', timeout=15000)
+        # 再等待一小会儿让主要内容渲染
+        await asyncio.sleep(1)
         
         return SkillResult.ok(
             data={

@@ -17,7 +17,7 @@ try:
     from PIL import Image
     import pyautogui
     VMS_AVAILABLE = True
-except ImportError:
+except Exception:
     VMS_AVAILABLE = False
 
 

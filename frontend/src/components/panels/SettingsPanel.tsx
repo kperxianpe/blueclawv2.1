@@ -4,7 +4,7 @@ import { Settings, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function SettingsPanel() {
-  const { canvasConfig, updateCanvasConfig, resetCanvasConfig } = useBlueprintStore();
+  const { canvasConfig, updateCanvasConfig, resetCanvasConfig, autoSelect, setAutoSelect } = useBlueprintStore();
   const [isExpanded, setIsExpanded] = useState(false);
 
   // 计算百分比显示
@@ -33,10 +33,27 @@ export function SettingsPanel() {
       <div
         className={cn(
           'overflow-hidden transition-all duration-300',
-          isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+          isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
         )}
       >
         <div className="px-3 py-3 space-y-4 border-t border-blue-800/30">
+          {/* AI 自动选择开关 */}
+          <div className="flex items-center justify-between py-1">
+            <div className="flex flex-col">
+              <label className="text-xs text-blue-200 font-medium">AI 自动选择后续选项</label>
+              <span className="text-[10px] text-blue-400">关闭后 AI 会在每个思考节点停下来等待您选择</span>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoSelect}
+                onChange={(e) => setAutoSelect(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-blue-800 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-yellow-400 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-400" />
+            </label>
+          </div>
+
           {/* 左右比例 */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">

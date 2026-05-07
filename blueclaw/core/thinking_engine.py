@@ -79,12 +79,22 @@ class ThinkingNode:
 class ThinkingEngine:
     """思考引擎 - 管理澄清流程"""
     
-    AUTO_SELECT_THRESHOLD = 0.85
-    MAX_DEPTH = 3
+    AUTO_SELECT_THRESHOLD = 0.35  # 澄清类 confidence 0.4-0.55，明确类 0.6-0.85，0.35 确保覆盖所有选项
+    MAX_DEPTH = 5  # 增加深度，给澄清环节留出更多轮次
     
     def __init__(self):
         self.nodes: Dict[str, ThinkingNode] = {}
         self.task_nodes: Dict[str, List[str]] = {}
+        self.task_settings: Dict[str, dict] = {}  # task_id -> {auto_select: bool}
+    
+    def set_task_auto_select(self, task_id: str, auto_select: bool):
+        """设置任务的 auto_select 开关"""
+        self.task_settings[task_id] = {"auto_select": auto_select}
+        print(f"[ThinkingEngine] Task {task_id} auto_select={auto_select}")
+    
+    def get_task_auto_select(self, task_id: str) -> bool:
+        """获取任务的 auto_select 设置"""
+        return self.task_settings.get(task_id, {}).get("auto_select", True)
     
     async def generate_initial_node(self, task_id: str, user_input: str, node_index: int = 0) -> ThinkingNode:
         """生成初始思考节点"""
@@ -153,7 +163,7 @@ class ThinkingEngine:
         """
         current_node = self.nodes.get(node_id)
         if not current_node:
-            print(f"[DEBUG select_option_impl] node not found: {node_id}")
+            # print(f"[DEBUG select_option_impl] node not found: {node_id}")
             return None
         
         current_node.selected_option_id = option_id
@@ -178,14 +188,14 @@ class ThinkingEngine:
             )
         
         if not selected_option:
-            print(f"[DEBUG select_option_impl] selected_option not found for {option_id}")
+            # print(f"[DEBUG select_option_impl] selected_option not found for {option_id}")
             return None
         
         # 判断是否收敛（思考3层后收敛）
         current_path = self._get_thinking_path(task_id, node_id)
-        print(f"[DEBUG select_option_impl] task={task_id}, node={node_id}, path_len={len(current_path)}, MAX_DEPTH={self.MAX_DEPTH}")
+        # print(f"[DEBUG select_option_impl] task={task_id}, node={node_id}, path_len={len(current_path)}, MAX_DEPTH={self.MAX_DEPTH}")
         if len(current_path) >= self.MAX_DEPTH:
-            print(f"[DEBUG select_option_impl] CONVERGED: path_len={len(current_path)} >= MAX_DEPTH={self.MAX_DEPTH}")
+            # print(f"[DEBUG select_option_impl] CONVERGED: path_len={len(current_path)} >= MAX_DEPTH={self.MAX_DEPTH}")
             return None  # 思考收敛
         
         # 生成下一个节点
@@ -197,11 +207,14 @@ class ThinkingEngine:
             node_index=next_node_index
         )
         
-        # 检查是否应自动选择（AI 高置信度推荐）
+        # 检查是否应自动选择（AI 高置信度推荐，受 auto_select 开关控制）
         if next_node:
-            auto_option_id = self.should_auto_select(next_node)
+            auto_option_id = self.should_auto_select(next_node, task_id)
             if auto_option_id:
-                print(f"[ThinkingEngine] Auto-selecting option {auto_option_id} for node {next_node.id} (confidence >= {self.AUTO_SELECT_THRESHOLD})")
+                # print(f"[ThinkingEngine] Auto-selecting option {auto_option_id} for node {next_node.id} (confidence >= {self.AUTO_SELECT_THRESHOLD})")
+                selected_opt = next((o for o in next_node.options if o.id == auto_option_id), next_node.options[0] if next_node.options else None)
+                conf_str = f"{selected_opt.confidence:.2f}" if selected_opt else "N/A"
+                print(f"[ThinkingEngine] AUTO-SELECT: option={auto_option_id}, node={next_node.id}, confidence={conf_str}")
                 return await self.select_option_impl(task_id, next_node.id, auto_option_id)
         
         return next_node
@@ -291,8 +304,24 @@ class ThinkingEngine:
 
 
     async def start_thinking(self, task_id: str, user_input: str) -> ThinkingNode:
-        """开始思考 - 生成初始节点"""
-        return await self.generate_initial_node(task_id, user_input, node_index=0)
+        """开始思考 - 生成初始节点，如果 auto_select=True 自动选择第一个高置信度选项"""
+        node = await self.generate_initial_node(task_id, user_input, node_index=0)
+        
+        # 如果开启 auto_select，自动选择第一个节点的高置信度选项
+        if node and self.get_task_auto_select(task_id):
+            auto_option_id = self.should_auto_select(node, task_id)
+            if auto_option_id:
+                result = await self.select_option_impl(task_id, node.id, auto_option_id)
+                # 如果收敛了（select_option_impl 返回 None），返回最后一个节点
+                if result is None and self.is_converged(task_id):
+                    node_ids = self.task_nodes.get(task_id, [])
+                    if node_ids:
+                        last_node = self.nodes.get(node_ids[-1])
+                        if last_node:
+                            return last_node
+                return result
+        
+        return node
     
     async def restart_thinking_from_intervention(
         self,
@@ -314,11 +343,18 @@ class ThinkingEngine:
         
         return await self.generate_initial_node(task_id, context, node_index=0)
     
-    def should_auto_select(self, node: ThinkingNode) -> Optional[str]:
-        """检查是否有高置信度选项可自动选择"""
+    def should_auto_select(self, node: ThinkingNode, task_id: str) -> Optional[str]:
+        """检查是否有高置信度选项可自动选择（受 auto_select 开关控制）"""
+        # 如果用户关闭了 auto_select，不自动选择
+        if not self.get_task_auto_select(task_id):
+            # print(f"[ThinkingEngine] Auto-select disabled for task {task_id}, skipping")
+            return None
+        
         for opt in node.options:
             if opt.confidence >= self.AUTO_SELECT_THRESHOLD:
                 return opt.id
+        if node.options:
+            print(f"[ThinkingEngine] No auto-select: max_confidence={max(o.confidence for o in node.options):.2f}, threshold={self.AUTO_SELECT_THRESHOLD}")
         return None
     
     def is_converged(self, task_id: str) -> bool:

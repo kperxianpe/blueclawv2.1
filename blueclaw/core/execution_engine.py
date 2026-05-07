@@ -74,6 +74,7 @@ class ExecutionStep:
     # Week 20.5 新增：工具绑定和提示
     tool_binding: Optional['ToolBinding'] = None  # 工具图标绑定
     tool_hint: Optional[str] = None               # 工具提示（用于智能选择）
+    parameters: Optional[Dict[str, Any]] = None   # LLM 生成的工具参数
     
     # Week 21 新增：绑定的 Adapter 列表
     attached_adapters: List[Dict] = field(default_factory=list)  # 右上角显示的 Adapter
@@ -104,6 +105,7 @@ class ExecutionStep:
             "position": self.position,
             "tool_binding": self.tool_binding.to_dict() if self.tool_binding else None,
             "tool_hint": self.tool_hint,
+            "parameters": self.parameters,
             "attached_adapters": self.attached_adapters,  # Week 21
             "is_main_path": self.is_main_path,
             "is_convergence": self.is_convergence,
@@ -255,6 +257,23 @@ class ExecutionEngine:
                 print(f"[ExecutionEngine] Screenshot empty for step {step.name} (browser not ready)")
         except Exception as e:
             print(f"[ExecutionEngine] Screenshot failed for step {step.name}: {e}")
+        
+        # ===== HTML Snapshot（极简浏览器）=====
+        try:
+            snap = await mgr.html_snapshot(blueprint.task_id)
+            if snap.get("html"):
+                from blueclaw.core.state_sync import state_sync
+                await state_sync.push_html_snapshot(
+                    blueprint.task_id,
+                    step.id if hasattr(step, 'id') else step.get('id', ''),
+                    snap["html"],
+                    url=snap.get("url", ""),
+                    title=snap.get("title", ""),
+                    adapter_id=blueprint.task_id
+                )
+                print(f"[ExecutionEngine] HTML snapshot pushed for step {step.name} ({len(snap['html'])} chars)")
+        except Exception as e:
+            print(f"[ExecutionEngine] HTML snapshot failed for step {step.name}: {e}")
     
     def _get_tool_registry(self):
         """延迟初始化工具注册表"""
@@ -364,7 +383,7 @@ class ExecutionEngine:
         steps = []
         name_to_id = {}
         for i, step_data in enumerate(steps_data):
-            step_id = f"step_{uuid.uuid4().hex[:8]}"
+            step_id = f"execution_{uuid.uuid4().hex[:8]}"
             step = ExecutionStep(
                 id=step_id,
                 name=step_data.get("name", f"步骤{i+1}"),
@@ -373,6 +392,7 @@ class ExecutionEngine:
                 example=step_data.get("example", ""),
                 validation=step_data.get("validation", ""),
                 tool=step_data.get("tool", "Skill"),
+                parameters=step_data.get("parameters", {}),
                 dependencies=step_data.get("dependencies", []),
                 position={"x": 100 + i * 250, "y": 400}
             )
@@ -407,6 +427,11 @@ class ExecutionEngine:
                 bound_tool = "skill-file"
             elif any(k in lowered for k in ["读取", "获取文件", "读文件"]):
                 bound_tool = "skill-file"
+            
+            # Week 30.5: 将搜索/查询步骤的 tool 设为 Browser，触发 WebAdapter 真实执行
+            if any(k in lowered for k in ["搜索", "查找", "查询", "查", "网页", "浏览器", "web", "browser"]):
+                step.tool = "Browser"
+                print(f"[create_blueprint] Set tool='Browser' for step '{step.name}' to trigger WebAdapter")
             
             if bound_tool:
                 step.tool_binding = ToolBinding(
@@ -451,6 +476,14 @@ class ExecutionEngine:
         token = CancellationToken(f"blueprint:{blueprint_id}")
         self._blueprint_tokens[blueprint_id] = token
         self._step_tasks[blueprint_id] = []
+        
+        # FIX: 推送 execution blueprint 加载消息到前端
+        try:
+            from blueclaw.core.state_sync import state_sync
+            await state_sync.push_execution_blueprint_loaded(blueprint.task_id, blueprint)
+            print(f"[Execution] Pushed blueprint_loaded for task {blueprint.task_id}")
+        except Exception as e:
+            print(f"[Execution] Failed to push blueprint_loaded: {e}")
         
         task = asyncio.create_task(self._execute_blueprint(blueprint_id))
         self.running_tasks[blueprint_id] = task
@@ -820,7 +853,100 @@ class ExecutionEngine:
         step: ExecutionStep,
         token: Optional[CancellationToken] = None
     ) -> Dict[str, Any]:
-        """旧版执行逻辑 - 使用 LLM 生成实际结果（支持 Token 取消）"""
+        """KimiCode-style 工具调用执行（支持 Token 取消）"""
+        from blueclaw.llm import LLMClient, Message
+        from blueclaw.llm.tool_calls import (
+            TOOLS_SCHEMA, 
+            create_tool_call_prompt,
+            create_execution_result_prompt,
+            TOOL_PARAMETER_RULES
+        )
+        from backend.core.task_manager import task_manager
+        
+        if token:
+            token.validate()
+        
+        task = task_manager.get_task(blueprint.task_id)
+        task_context = task.user_input if task else blueprint.task_id
+        
+        # ===== Phase 1: LLM 自动选择工具和提取参数（KimiCode-style）=====
+        tool_call_prompt = create_tool_call_prompt(
+            step_name=step.name,
+            step_direction=step.direction,
+            step_tool=step.tool
+        )
+        
+        try:
+            tool_response = await LLMClient().chat_completion(
+                [
+                    Message(role="system", content="You are a tool selection expert. Choose the best tool and extract parameters."),
+                    Message(role="user", content=tool_call_prompt)
+                ]
+            )
+            
+            # 解析工具选择结果
+            import json
+            tool_call_result = json.loads(tool_response.content.strip())
+            selected_tool = tool_call_result.get("tool", step.tool or "llm_generate")
+            tool_parameters = tool_call_result.get("parameters", {})
+            
+            print(f"[ExecutionEngine] Tool selected: {selected_tool}, params: {tool_parameters}")
+            
+            # ===== Phase 2: 执行工具 =====
+            tool_result = await self._execute_tool(
+                tool_name=selected_tool,
+                parameters=tool_parameters,
+                step=step,
+                blueprint=blueprint,
+                token=token
+            )
+            
+            if token:
+                token.validate()
+            
+            # ===== Phase 3: LLM 根据工具结果生成最终回复（KimiCode-style 回传）=====
+            # 过滤掉 screenshot 等超大二进制字段，防止 prompt 超出 LLM 上下文限制
+            tool_result_for_llm = {k: v for k, v in tool_result.items() if k != "screenshot"}
+            
+            result_prompt = create_execution_result_prompt(
+                task_context=task_context,
+                step_name=step.name,
+                tool_result=tool_result_for_llm
+            )
+            
+            print(f"[ExecutionEngine] Phase 3 prompt length: {len(result_prompt)}, preview: {result_prompt[:300]}")
+            
+            result_response = await LLMClient().chat_completion(
+                [
+                    Message(role="system", content="You are a helpful assistant. Generate results based on tool execution output."),
+                    Message(role="user", content=result_prompt)
+                ]
+            )
+            
+            result_text = result_response.content.strip()
+            if not result_text or result_text.lower() in ["none", "null", ""]:
+                raise StepExecutionError(
+                    "empty_response", False,
+                    {"message": f"LLM returned empty or null content for step '{step.name}'"}
+                )
+            return {"success": True, "result": result_text, "tool_used": selected_tool, "tool_result": tool_result}
+            
+        except asyncio.CancelledError:
+            raise
+        except StepExecutionError:
+            raise
+        except Exception as e:
+            print(f"[Execution] KimiCode-style execution failed for {step.name}: {e}")
+            # Fallback to original behavior
+            return await self._execute_step_legacy_fallback(blueprint, step, token)
+    
+    async def _execute_step_legacy_fallback(
+        self,
+        blueprint: ExecutionBlueprint,
+        step: ExecutionStep,
+        token: Optional[CancellationToken] = None
+    ) -> Dict[str, Any]:
+        """原版执行逻辑的 fallback"""
         from blueclaw.llm import LLMClient, Message
         from backend.core.task_manager import task_manager
         
@@ -835,9 +961,21 @@ class ExecutionEngine:
 步骤名称: {step.name}
 步骤说明: {step.description}
 执行方向: {step.direction}
+验证规则: {step.validation}
 
-请根据用户原始需求和步骤信息，生成具体的执行结果。结果应该详细、有信息量，并且与用户原始需求直接相关。
-特别注意：用户原始需求中明确提到了地点和主题，请在结果中具体体现该地点的特色景点、活动或信息，不要生成通用内容。
+请根据用户原始需求和步骤信息，生成具体的执行结果。
+
+输出要求（严格遵守）：
+1. 使用 Markdown 格式
+2. 必须包含以下章节：
+   - ## 结果摘要（100字以内的核心结论）
+   - ## 详细内容（具体信息、数据、分析）
+   - ## 信息来源（数据来自哪里，如果是推测请标明）
+3. 如果涉及数据对比，使用 Markdown 表格
+4. 内容长度控制在 300-800 字
+5. 如果无法完成或信息不足，首行必须是 `FAILED: 具体原因`
+6. 自检：生成后请检查是否满足验证规则，如果不满足请补充
+
 直接输出结果内容，不要添加任何解释。"""
         
         try:
@@ -861,8 +999,204 @@ class ExecutionEngine:
         except StepExecutionError:
             raise
         except Exception as e:
-            print(f"[Execution] LLM execution failed for {step.name}: {e}")
+            print(f"[Execution] Fallback execution failed for {step.name}: {e}")
             raise self._classify_error(e)
+    
+    def _sanitize_search_query(self, query: str, step_name: str) -> str:
+        """搜索关键词后处理：确保不长于合理长度，去掉动词前缀"""
+        if not query:
+            query = step_name
+        
+        # 去掉常见动词前缀
+        prefixes = ["检索", "查找", "搜索", "收集", "获取", "查询", "寻找", "调研", "分析", "整理"]
+        for prefix in prefixes:
+            if query.startswith(prefix):
+                query = query[len(prefix):].strip()
+                break
+        
+        # 去掉常见后缀/填充词
+        suffixes = ["的信息", "的相关资料", "的详细内容", "相关内容", "详细资料"]
+        for suffix in suffixes:
+            if query.endswith(suffix):
+                query = query[:-len(suffix)].strip()
+                break
+        
+        # 如果仍然太长，截取前25字并补 site 限定
+        if len(query) > 30:
+            # 优先保留前25字，去掉末尾不完整的词
+            query = query[:25].rsplit(" ", 1)[0].strip()
+        
+        # 添加中文技术内容 site 限定（如果还没有）
+        if any(c in query for c in "技术美术编程前端后端开发教程"):
+            if "site:" not in query:
+                query += " site:csdn.net"
+        
+        return query.strip() or step_name
+    
+    def _clean_html(self, html: str, max_chars: int = 3000) -> str:
+        """清洗并截断 HTML，只保留关键文本内容供 LLM 分析"""
+        import re
+        # 去掉 script/style 标签及其内容
+        cleaned = re.sub(r'<(script|style|noscript)[^>]*>.*?</\1>', '', html, flags=re.DOTALL | re.IGNORECASE)
+        # 去掉 head 区域
+        cleaned = re.sub(r'<head[^>]*>.*?</head>', '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+        # 去掉 HTML 标签，保留文本
+        text = re.sub(r'<[^>]+>', ' ', cleaned)
+        # 合并多个空白字符
+        text = re.sub(r'\s+', ' ', text).strip()
+        # 去掉常见噪声词（CSS class/ID 残留等）
+        noise_patterns = [
+            r'\b(?:function|var|let|const|return|if|else|for|while|document|window)\b',
+            r'\b(?:display|position|margin|padding|color|background|font|width|height)\b[^:]*:[^;]*;',
+            r'\{[^}]*\}',
+        ]
+        for pattern in noise_patterns:
+            text = re.sub(pattern, ' ', text, flags=re.IGNORECASE)
+        text = re.sub(r'\s+', ' ', text).strip()
+        # 截断并标注
+        original_len = len(text)
+        if len(text) > max_chars:
+            text = text[:max_chars].rsplit(' ', 1)[0]  # 避免截断在单词中间
+            text += f"\n... [已截断，原始内容共 {original_len} 字符]"
+        return text
+
+    async def _execute_tool(
+        self,
+        tool_name: str,
+        parameters: dict,
+        step: ExecutionStep,
+        blueprint: ExecutionBlueprint,
+        token: Optional[CancellationToken] = None
+    ) -> dict:
+        """执行具体工具（KimiCode-style）"""
+        if token:
+            token.validate()
+        
+        task_id = blueprint.task_id
+        
+        if tool_name == "skill_search" or tool_name == "skill-search":
+            # 执行搜索
+            raw_query = parameters.get("query", step.direction)
+            
+            # ===== 关键词后处理：防止整段描述塞进搜索栏 =====
+            query = self._sanitize_search_query(raw_query, step.name)
+            
+            engine = parameters.get("engine", "bing")
+            max_results = parameters.get("max_results", 10)
+            
+            print(f"[ExecutionEngine] Search query sanitized: '{raw_query}' -> '{query}'")
+            
+            # WebAdapter 导航
+            try:
+                mgr = self._get_adapter_mgr()
+                if mgr:
+                    adapter = mgr._adapters.get("web")
+                    if adapter and hasattr(adapter, '_page') and adapter._page:
+                        from urllib.parse import quote_plus
+                        search_url = f'https://www.bing.com/search?q={quote_plus(query)}'
+                        await adapter._page.goto(search_url, wait_until='domcontentloaded', timeout=15000)
+                        print(f"[ExecutionEngine] WebAdapter search: {query}")
+                        
+                        # 等待页面加载
+                        await asyncio.sleep(2)
+                        
+                        # 截图
+                        screenshot_b64 = await adapter._page.screenshot(type='jpeg', quality=70)
+                        return {
+                            "success": True,
+                            "query": query,
+                            "url": search_url,
+                            "screenshot": screenshot_b64,
+                            "message": f"搜索完成: {query}"
+                        }
+            except Exception as e:
+                print(f"[ExecutionEngine] Search tool error: {e}")
+            
+            return {"success": True, "query": query, "message": f"搜索参数已生成: {query}"}
+        
+        elif tool_name == "llm_generate":
+            # 直接返回参数，让上层 LLM 生成
+            return {
+                "success": True,
+                "prompt": parameters.get("prompt", step.direction),
+                "format": parameters.get("format", "markdown"),
+                "message": "内容生成参数已准备"
+            }
+        
+        elif tool_name == "adapter_web":
+            # 浏览器操作
+            url = parameters.get("url", "")
+            action = parameters.get("action", "goto")
+            
+            # 规范化 action：visit/navigate/get_* 等任意非空值，只要有 url 就当 goto 处理
+            # scroll 单独处理（非导航，是页面交互）
+            should_navigate = bool(url) and action not in ["", None, "screenshot", "click", "fill"]
+            
+            try:
+                mgr = self._get_adapter_mgr()
+                if mgr:
+                    # ===== WebAdapter 自动初始化 =====
+                    if task_id not in getattr(mgr, '_task_adapter_map', {}):
+                        try:
+                            from blueclaw.adapter.models import ExecutionBlueprint as AdapterBP
+                            adapter_bp = AdapterBP(
+                                task_id=task_id,
+                                adapter_type="web",
+                                steps=[],
+                                config={"extra": {"viewport": {"width": 1280, "height": 720}}}
+                            )
+                            adapter = mgr.get_adapter("web")
+                            if getattr(adapter, '_page', None) is None:
+                                await adapter.init(adapter_bp)
+                                print(f"[ExecutionEngine] WebAdapter auto-initialized for {task_id}")
+                            mgr._task_adapter_map[task_id] = "web"
+                        except Exception as e2:
+                            print(f"[ExecutionEngine] WebAdapter auto-init failed: {e2}")
+                    
+                    adapter = mgr._adapters.get("web")
+                    if adapter and hasattr(adapter, '_page') and adapter._page:
+                        if action == "scroll":
+                            selector = parameters.get("selector", "")
+                            if selector:
+                                try:
+                                    await adapter._page.evaluate(f"document.querySelector('{selector}').scrollIntoView()")
+                                except Exception:
+                                    await adapter._page.evaluate("window.scrollBy(0, 500)")
+                            else:
+                                await adapter._page.evaluate("window.scrollBy(0, 500)")
+                            return {"success": True, "action": "scroll", "selector": selector, "message": "页面已滚动"}
+                        elif should_navigate:
+                            print(f"[ExecutionEngine] WebAdapter navigating to: {url}")
+                            await adapter._page.goto(url, wait_until='domcontentloaded', timeout=15000)
+                            await asyncio.sleep(2)
+                            screenshot_b64 = await adapter._page.screenshot(type='jpeg', quality=70)
+                            # 获取 HTML 内容长度验证页面是否真正加载
+                            html_content = await adapter._page.content()
+                            # 清洗截断 HTML，防止 Phase 3 LLM 400 Bad Request
+                            cleaned_text = self._clean_html(html_content, max_chars=3000)
+                            print(f"[ExecutionEngine] WebAdapter loaded {len(html_content)} chars, cleaned to {len(cleaned_text)} chars, screenshot {len(screenshot_b64)} bytes")
+                            if len(html_content) < 200:
+                                print(f"[ExecutionEngine] WARNING: Page content too short ({len(html_content)} chars), may be blocked or blank")
+                            return {"success": True, "url": url, "screenshot": screenshot_b64, "html_length": len(html_content), "html_summary": cleaned_text}
+                        elif action == "screenshot":
+                            screenshot_b64 = await adapter._page.screenshot(type='jpeg', quality=70)
+                            return {"success": True, "screenshot": screenshot_b64}
+                        elif action == "click" and parameters.get("selector"):
+                            await adapter._page.click(parameters["selector"])
+                            return {"success": True, "action": "click", "selector": parameters["selector"]}
+                        elif action == "fill" and parameters.get("selector"):
+                            await adapter._page.fill(parameters["selector"], parameters.get("value", ""))
+                            return {"success": True, "action": "fill", "selector": parameters["selector"]}
+            except Exception as e:
+                print(f"[ExecutionEngine] Web tool error: {e}")
+                import traceback
+                traceback.print_exc()
+                return {"success": False, "url": url, "action": action, "error": str(e)}
+            
+            return {"success": False, "url": url, "action": action, "error": "No WebAdapter available or no URL provided"}
+        
+        else:
+            return {"success": False, "error": f"Unknown tool: {tool_name}"}
     
     async def _execute_step_with_binding(
         self,
@@ -935,13 +1269,25 @@ class ExecutionEngine:
         
         print(f"[Execution] Using bound tool: {tool_icon.name} ({tool_icon.type.value})")
         
-        # 渲染参数模板
-        parameters = self._render_parameters(
-            tool_icon.config.get("parameters", {}),
-            task_id,
-            step,
-            tool_id=tool_icon.id
-        )
+        # 渲染参数模板 —— 优先使用 LLM 在 blueprint 阶段生成的 parameters
+        if step.parameters and isinstance(step.parameters, dict) and len(step.parameters) > 0:
+            parameters = dict(step.parameters)
+            # 但保留模板变量替换（如 {{task_id}} 等）
+            for key, value in parameters.items():
+                if isinstance(value, str):
+                    value = value.replace("{{task_id}}", task_id)
+                    value = value.replace("{{step_name}}", step.name)
+                    value = value.replace("{{direction}}", step.direction)
+                    parameters[key] = value
+            print(f"[Execution] Using LLM-generated parameters for step '{step.name}': {parameters}")
+        else:
+            parameters = self._render_parameters(
+                tool_icon.config.get("parameters", {}),
+                task_id,
+                step,
+                tool_id=tool_icon.id
+            )
+            print(f"[Execution] Using rendered parameters for step '{step.name}': {parameters}")
         
         # 特殊处理: skill-file 写文档时，用 LLM 生成完整内容
         if binding.tool_icon_id == "skill-file" and parameters.get("operation") == "write":
@@ -981,12 +1327,72 @@ class ExecutionEngine:
                 print(f"[Execution] LLM doc generation failed: {e}")
                 parameters["content"] = parameters.get("content", step.direction)
         
-        # 特殊处理: skill-search 查询价格时，构造具体查询词
+        # Skill-search 使用 step.direction 提炼关键词后作为查询词
         if binding.tool_icon_id == "skill-search":
-            query = parameters.get("query", step.direction)
-            if "杭州" not in query and "价格" not in query:
-                query = f"杭州3日游 {step.name} {query}"
+            raw_query = parameters.get("query", step.direction)
+            
+            # ===== 关键词提炼：将方向描述提炼为搜索关键词 =====
+            try:
+                from blueclaw.llm import LLMClient, Message
+                keyword_prompt = f"""将以下任务描述提炼为适合搜索引擎的简短关键词（3-5个词）：
+任务：{raw_query}
+要求：
+1. 去掉动词和修饰语，保留核心名词和术语
+2. 如果是中文技术内容，添加 site:csdn.net 限定
+3. 如果是英文内容，保留英文术语
+4. 只输出关键词，不要解释，不要引号
+
+示例：
+- 输入："收集技术美术在游戏行业的职位要求信息"
+- 输出：技术美术 职位要求 游戏行业 site:csdn.net
+
+输出："""
+                kw_response = await LLMClient().chat_completion([
+                    Message(role="system", content="You are a search query optimizer. Output only keywords, no explanation."),
+                    Message(role="user", content=keyword_prompt)
+                ])
+                query = kw_response.content.strip().replace('"', '').replace("'", "")
+                if not query or len(query) < 2:
+                    query = raw_query
+                print(f"[ExecutionEngine] Search keywords refined: '{raw_query}' -> '{query}'")
+            except Exception as e:
+                print(f"[ExecutionEngine] Keyword refinement failed, using raw: {e}")
+                query = raw_query
+            
             parameters["query"] = query
+            
+            # ===== 同步 WebAdapter 导航（极简浏览器显示）=====
+            try:
+                mgr = self._get_adapter_mgr()
+                if mgr:
+                    # 如果 WebAdapter 未初始化，先自动初始化
+                    if task_id not in getattr(mgr, '_task_adapter_map', {}):
+                        try:
+                            from blueclaw.adapter.models import ExecutionBlueprint as AdapterBP
+                            adapter_bp = AdapterBP(
+                                task_id=task_id,
+                                adapter_type="web",
+                                steps=[],
+                                config={"extra": {"viewport": {"width": 1280, "height": 720}}}
+                            )
+                            adapter = mgr.get_adapter("web")
+                            if getattr(adapter, '_page', None) is None:
+                                await adapter.init(adapter_bp)
+                                print(f"[ExecutionEngine] WebAdapter auto-initialized for {task_id}")
+                            mgr._task_adapter_map[task_id] = "web"
+                        except Exception as e2:
+                            print(f"[ExecutionEngine] WebAdapter auto-init failed: {e2}")
+                    
+                    adapter = mgr._adapters.get("web")
+                    if adapter and hasattr(adapter, '_page') and adapter._page:
+                        from urllib.parse import quote_plus
+                        search_url = f'https://www.bing.com/search?q={quote_plus(query)}'
+                        await adapter._page.goto(search_url, wait_until='domcontentloaded', timeout=15000)
+                        print(f"[ExecutionEngine] WebAdapter navigated to search: {query}")
+                else:
+                    print(f"[ExecutionEngine] AdapterManager not available, skipping WebAdapter navigation")
+            except Exception as e:
+                print(f"[ExecutionEngine] WebAdapter search navigation skipped: {e}")
         
         if token:
             token.validate()
@@ -1636,9 +2042,34 @@ class ExecutionEngine:
         print(f"[BranchLayout] Convergence nodes: {[s.id for s in steps if s.is_convergence]}")
     
     def _create_default_steps(self, thinking_path: List[dict]) -> List[dict]:
+        """根据用户意图生成合理的默认步骤（LLM 失败时 fallback）"""
+        # 从 thinking_path 提取原始用户输入
+        user_input = ""
+        if thinking_path:
+            first_node = thinking_path[0]
+            if isinstance(first_node, dict):
+                user_input = first_node.get("question", "") or first_node.get("context", "")
+        
+        user_input_lower = user_input.lower()
+        
+        # 检测常见歧义缩写并生成针对性步骤
+        if "ta" in user_input_lower or "技术美术" in user_input_lower:
+            return [
+                {"name": "检索TA教程资源", "description": "搜索 Technical Artist（技术美术）相关教程、文档和学习资源", "direction": "使用搜索引擎检索技术美术教程，site:csdn.net 或 site:bilibili.com", "example": "获得5-10个相关教程链接", "validation": "结果数量≥3且包含技术美术相关内容", "tool": "skill-search", "parameters": {"query": "Technical Artist 技术美术 教程 site:csdn.net", "max_results": 10}},
+                {"name": "分析职位技能要求", "description": "整理技术美术岗位的核心技能、工具和学习路径", "direction": "从检索结果中提取技术美术需要掌握的Shader、渲染管线、美术工具等技能", "example": "列出核心技能清单", "validation": "包含至少5个具体技能或工具", "tool": "llm-generate", "parameters": {"format": "技能清单"}},
+                {"name": "生成学习报告", "description": "汇总技术美术教程信息，生成结构化学习指南", "direction": "整合所有检索结果，生成包含资源链接、学习路径、技能要求的报告", "example": "完整的TA学习指南", "validation": "报告≥300字且包含具体资源链接", "tool": "llm-generate", "parameters": {"format": "markdown"}}
+            ]
+        elif "前端" in user_input_lower:
+            return [
+                {"name": "澄清前端方向", "description": "确认用户需要的是前端开发还是前端设计", "direction": "询问用户：您需要的是前端开发工程师（HTML/CSS/JS）还是前端/UI设计师？", "example": "用户明确选择开发或设计", "validation": "用户已选择具体方向", "tool": "llm-generate", "parameters": {"type": "clarification"}},
+                {"name": "检索前端资源", "description": "根据确认的方向检索学习资源", "direction": "搜索对应方向的学习教程、框架文档、实战项目", "example": "获得相关教程列表", "validation": "结果非空", "tool": "skill-search", "parameters": {"max_results": 10}}
+            ]
+        
+        # 通用 fallback
         return [
-            {"name": "准备环境", "description": "准备执行环境", "direction": "环境准备", "example": "准备完成", "validation": "检查通过", "tool": "Skill"},
-            {"name": "执行主要任务", "description": "执行核心任务", "direction": "任务执行", "example": "任务完成", "validation": "结果符合预期", "tool": "Skill"}
+            {"name": "澄清用户需求", "description": "明确用户意图的具体细节", "direction": "分析用户输入中的关键信息，确认任务范围和目标", "example": "获得明确的任务描述", "validation": "用户意图已明确", "tool": "llm-generate"},
+            {"name": "检索相关信息", "description": "搜索与任务相关的信息和资源", "direction": "使用搜索引擎查找相关资料、文档或教程", "example": "获得5-10个相关结果", "validation": "结果数量≥3", "tool": "skill-search", "parameters": {"max_results": 10}},
+            {"name": "生成结果报告", "description": "汇总信息并生成结构化输出", "direction": "整合所有检索和分析结果，生成清晰、有用的最终报告", "example": "完整的任务报告", "validation": "报告≥300字", "tool": "llm-generate", "parameters": {"format": "markdown"}}
         ]
 
 

@@ -23,11 +23,12 @@ class TaskManager:
         """设置 WebSocket 服务器引用"""
         self.server = server
     
-    async def create_task(self, user_input: str) -> Task:
+    async def create_task(self, user_input: str, auto_select: bool = True) -> Task:
         """创建新任务"""
         from core.checkpoint import checkpoint_manager
         
         task = Task.create(user_input)
+        task.auto_select = auto_select
         self.tasks[task.id] = task
         
         # 保存初始检查点

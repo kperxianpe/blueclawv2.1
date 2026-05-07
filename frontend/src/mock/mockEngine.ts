@@ -21,7 +21,7 @@ export function generateThinkingNode(index: number, customQuestion?: string): Th
       { id: 'C', label: '休闲度假', description: '温泉、海滩、慢生活', confidence: 0.72 },
     ],
     [
-      { id: 'A', label: '杭州', description: '西湖、灵隐寺、龙井茶', confidence: 0.88, isDefault: true },
+      { id: 'A', label: '北京', description: '故宫、长城、天坛', confidence: 0.88, isDefault: true },
       { id: 'B', label: '苏州', description: '园林、古镇、小桥流水', confidence: 0.82 },
       { id: 'C', label: '黄山', description: '奇松、怪石、云海日出', confidence: 0.75 },
     ],
@@ -77,7 +77,7 @@ export function generateExecutionBlueprint(
   // 1. 查询天气
   executionStepCounter++;
   steps.push({
-    id: `step_${executionStepCounter.toString().padStart(3, '0')}`,
+    id: `execution_${executionStepCounter.toString().padStart(3, '0')}`,
     name: '查询天气',
     description: '获取目的地未来3天天气预报',
     status: 'pending',
@@ -89,7 +89,7 @@ export function generateExecutionBlueprint(
   // 2. 搜索景点
   executionStepCounter++;
   steps.push({
-    id: `step_${executionStepCounter.toString().padStart(3, '0')}`,
+    id: `execution_${executionStepCounter.toString().padStart(3, '0')}`,
     name: '搜索景点',
     description: '查找当地热门景点和必去打卡地',
     status: 'pending',
@@ -101,7 +101,7 @@ export function generateExecutionBlueprint(
   // 3. 规划交通 (分支起点)
   executionStepCounter++;
   steps.push({
-    id: `step_${executionStepCounter.toString().padStart(3, '0')}`,
+    id: `execution_${executionStepCounter.toString().padStart(3, '0')}`,
     name: '规划交通',
     description: '规划从出发地到目的地的最佳路线',
     status: 'pending',
@@ -151,7 +151,7 @@ export function generateExecutionBlueprint(
   // 7. 对比方案（汇合所有分支）- 使用统一间距
   executionStepCounter++;
   steps.push({
-    id: `step_${executionStepCounter.toString().padStart(3, '0')}`,
+    id: `execution_${executionStepCounter.toString().padStart(3, '0')}`,
     name: '对比方案',
     description: '对比高铁/航班/自驾的成本和时间',
     status: 'pending',
@@ -165,7 +165,7 @@ export function generateExecutionBlueprint(
   // 8. 推荐酒店
   executionStepCounter++;
   steps.push({
-    id: `step_${executionStepCounter.toString().padStart(3, '0')}`,
+    id: `execution_${executionStepCounter.toString().padStart(3, '0')}`,
     name: '推荐酒店',
     description: '根据预算和位置推荐合适的住宿',
     status: 'pending',
@@ -177,7 +177,7 @@ export function generateExecutionBlueprint(
   // 9. 生成行程
   executionStepCounter++;
   steps.push({
-    id: `step_${executionStepCounter.toString().padStart(3, '0')}`,
+    id: `execution_${executionStepCounter.toString().padStart(3, '0')}`,
     name: '生成行程',
     description: '整合所有信息生成完整行程单',
     status: 'pending',
