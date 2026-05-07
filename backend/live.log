@@ -1,0 +1,81 @@
+[Main] Loaded .env from /root/.openclaw/workspace/blueclawv2.1/.env
+[Main] KIMI_API_KEY set: Yes
+[VMS] Warning: PIL/pyautogui not available, using mock mode
+[MPL] Warning: pyautogui not available, using mock mode
+[MCP] SDK not available, using mock mode
+[MCP] Loaded config from backend/config/mcp_servers.json
+[MCP] SDK not available, using mock mode
+[MCP] Loaded config from backend/config/mcp_servers.json
+[Main] TaskManager and MessageRouter server references set
+[Main] Starting Blueclaw v2.5 Unified Server on port 8006
+[Main]   HTTP REST: http://localhost:8006/api/ide/*
+[Main]   WS Main  : ws://localhost:8006/ws
+[Main]   WS IDE   : ws://localhost:8006/ws/ide
+INFO:     Started server process [672463]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    [Errno 98] error while attempting to bind on address ('127.0.0.1INFO:     127.0.0.1:52806 - "WebSocket /ws" [accepted]
+[WS] New connection: dd8a49c1-1bd9-468e-b07d-812bdc998155
+INFO:     connection open
+[WS] Received: task.start
+Checkpoint saved: task_f846fa5f
+Task created: task_f846fa5f
+INFO:     connection closed
+[WS] Sent response for: task.start
+[WS] Error: WebSocket is not connected. Need to call "accept" first.
+INFO:     127.0.0.1:40904 - "WebSocket /ws" [accepted]
+[WS] New connection: c7a3ab40-9408-4132-bf9a-a26dabcb5570
+INFO:     connection open
+[WS] Received: task.start
+Checkpoint saved: task_bde05262
+Task created: task_bde05262
+INFO:     connection closed
+[WS] Sent response for: task.start
+[WS] Error: WebSocket is not connected. Need to call "accept" first.
+INFO:     127.0.0.1:59264 - "WebSocket /ws" [accepted]
+[WS] New connection: 1d01f17e-ffb5-4588-8ae3-3d1677fa98a0
+INFO:     connection open
+[WS] Received: task.start
+Checkpoint saved: task_dbe1b74c
+Task created: task_dbe1b74c
+[WS] Sent response for: task.start
+[WS] Connection closed: 1d01f17e-ffb5-4588-8ae3-3d1677fa98a0
+INFO:     connection closed
+INFO:     127.0.0.1:52370 - "WebSocket /ws" [accepted]
+[WS] New connection: 01ccd587-7575-491a-9d79-9fc27d6ac3a1
+INFO:     connection open
+INFO:     127.0.0.1:52380 - "WebSocket /ws" [accepted]
+[WS] New connection: 120f72df-a35d-4239-a695-a58f7829e80f
+INFO:     connection open
+[WS] Received: task.start
+Checkpoint saved: task_5534db7c
+Task created: task_5534db7c
+[WS] Connection closed: 01ccd587-7575-491a-9d79-9fc27d6ac3a1
+INFO:     connection closed
+INFO:     connection closed
+[WS] Sent response for: task.start
+[WS] Error: WebSocket is not connected. Need to call "accept" first.
+INFO:     127.0.0.1:35222 - "WebSocket /ws" [accepted]
+[WS] New connection: e493ff25-9675-42c0-bfe9-af36ff2a3b2e
+INFO:     connection open
+[WS] Connection closed: e493ff25-9675-42c0-bfe9-af36ff2a3b2e
+INFO:     connection closed
+INFO:     127.0.0.1:54732 - "WebSocket /ws" [accepted]
+[WS] New connection: d5875dcd-6c94-4f18-92c9-aeaa061e48ad
+INFO:     connection open
+[WS] Connection closed: d5875dcd-6c94-4f18-92c9-aeaa061e48ad
+INFO:     connection closed
+INFO:     127.0.0.1:45808 - "WebSocket /ws" [accepted]
+[WS] New connection: 19289a2c-47b5-4f50-8065-41d3a9eb9f1f
+INFO:     connection open
+INFO:     127.0.0.1:45816 - "WebSocket /ws" [accepted]
+[WS] New connection: 8d59b93a-0ca4-4503-b690-e8c8e3360063
+INFO:     connection open
+[WS] Received: task.start
+Checkpoint saved: task_82938c34
+Task created: task_82938c34
+[WS] Sent response for: task.start
+[WS] Connection closed: 8d59b93a-0ca4-4503-b690-e8c8e3360063
+INFO:     connection closed
+[WS] Connection closed: 19289a2c-47b5-4f50-8065-41d3a9eb9f1f
+INFO:     connection closed

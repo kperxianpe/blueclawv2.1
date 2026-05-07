@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_191bedfc",
+    "user_input": "4399小游戏最火的游戏是哪个",
+    "status": "EXECUTING",
+    "created_at": 1777462514.1080415,
+    "updated_at": 1777462538.5080502,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-29T19:35:38.508090",
+  "version": 1
+}

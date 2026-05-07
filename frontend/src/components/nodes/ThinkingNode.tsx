@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Brain, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
 import { useBlueprintStore } from '@/store/useBlueprintStore';
@@ -19,6 +19,7 @@ export function ThinkingNodeComponent({ data }: ThinkingNodeProps) {
   const selectThinkingOption = useBlueprintStore(state => state.selectThinkingOption);
   const setCustomInput = useBlueprintStore(state => state.setCustomInput);
   const selectThinkingNode = useBlueprintStore(state => state.selectThinkingNode);
+  const rethinkFromNode = useBlueprintStore(state => state.rethinkFromNode);
   
   const { isConnected, send } = useWebSocket();
   
@@ -31,6 +32,13 @@ export function ThinkingNodeComponent({ data }: ThinkingNodeProps) {
   const isSelected = selectedNodeId === nodeId;
   const isPending = node.status === 'pending';
   const isDone = node.status === 'selected';
+
+  // 被选中时自动展开
+  useEffect(() => {
+    if (isSelected && !isExpanded) {
+      setIsExpanded(true);
+    }
+  }, [isSelected]);
 
   const handleExpand = () => {
     setIsExpanded(!isExpanded);
@@ -82,7 +90,7 @@ export function ThinkingNodeComponent({ data }: ThinkingNodeProps) {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" data-nodeid={nodeId}>
       {/* 输入连接点 */}
       <Handle 
         type="target" 
@@ -152,15 +160,19 @@ export function ThinkingNodeComponent({ data }: ThinkingNodeProps) {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  // 干涉：重新思考从当前节点
-                  if (phase === 'thinking' && isPending) {
-                    // 可以重新选择
+                  // 重新思考：清除当前及后续节点，重新选择
+                  if (phase === 'thinking' && (isPending || isDone)) {
+                    rethinkFromNode(nodeId);
+                    // 展开当前节点让用户重新选择
+                    if (!isExpanded) {
+                      setIsExpanded(true);
+                    }
                   }
                 }}
-                disabled={!isPending || phase !== 'thinking'}
+                disabled={phase !== 'thinking'}
                 className={cn(
                   "px-2 py-1 rounded text-[10px] font-medium transition-colors",
-                  isPending && phase === 'thinking'
+                  phase === 'thinking'
                     ? "bg-red-500 hover:bg-red-600 text-white"
                     : "bg-gray-700 text-gray-500 cursor-not-allowed"
                 )}

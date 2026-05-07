@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_680de1a8",
+    "user_input": "查询日本旅游最近的新闻给出总结",
+    "status": "EXECUTING",
+    "created_at": 1777467813.445184,
+    "updated_at": 1777467835.2636466,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-29T21:03:55.263696",
+  "version": 1
+}

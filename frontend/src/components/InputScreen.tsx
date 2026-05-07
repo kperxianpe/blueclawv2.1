@@ -1,23 +1,29 @@
 import { useState } from 'react';
-import { Sparkles, ArrowRight, MapPin, Code } from 'lucide-react';
+import { Sparkles, ArrowRight, MapPin, Code, Key, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 interface InputScreenProps {
-  onSubmit: (input: string) => void;
+  onSubmit: (input: string, apiKey?: string) => void;
 }
 
 const quickExamples = [
-  { text: '规划杭州2日游', icon: MapPin },
+  { text: '帮我规划北京3日游', icon: MapPin },
   { text: '写Python脚本', icon: Code },
 ];
 
 export function InputScreen({ onSubmit }: InputScreenProps) {
   const [input, setInput] = useState('');
+  const [apiKey, setApiKey] = useState(localStorage.getItem('blueclaw_api_key') || '');
+  const [showKey, setShowKey] = useState(false);
 
   const handleSubmit = () => {
     if (input.trim()) {
-      onSubmit(input.trim());
+      // Save key to localStorage for convenience
+      if (apiKey.trim()) {
+        localStorage.setItem('blueclaw_api_key', apiKey.trim());
+      }
+      onSubmit(input.trim(), apiKey.trim() || undefined);
     }
   };
 
@@ -47,6 +53,27 @@ export function InputScreen({ onSubmit }: InputScreenProps) {
         </p>
       </div>
 
+      {/* API Key Input */}
+      <div className="w-full max-w-2xl mb-4">
+        <div className="relative">
+          <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            type={showKey ? 'text' : 'password'}
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="填入 Kimi API Key（可选，留空则使用系统默认）"
+            className="w-full h-10 pl-10 pr-10 text-sm rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
+          />
+          <button
+            type="button"
+            onClick={() => setShowKey(!showKey)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+
       {/* Input Box */}
       <div className="w-full max-w-2xl mb-6">
         <div className="relative">
@@ -60,6 +87,7 @@ export function InputScreen({ onSubmit }: InputScreenProps) {
           <Button
             onClick={handleSubmit}
             disabled={!input.trim()}
+            data-testid="submit-task"
             className="absolute right-2 top-1/2 -translate-y-1/2 h-12 px-6 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             开始

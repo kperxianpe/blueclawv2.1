@@ -96,7 +96,7 @@ export function ExecutionNodeComponent({ data }: ExecutionNodeProps) {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" data-nodeid={stepId}>
       {/* 输入连接点 */}
       <Handle 
         type="target" 

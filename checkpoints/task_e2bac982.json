@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_e2bac982",
+    "user_input": "帮我规划一个周末旅行",
+    "status": "created",
+    "created_at": 1777351854.6151314,
+    "updated_at": 1777351854.6151314,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-28T12:50:54.615182",
+  "version": 1
+}

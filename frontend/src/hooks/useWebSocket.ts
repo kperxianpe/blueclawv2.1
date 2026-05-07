@@ -24,6 +24,31 @@ export function useWebSocket() {
   const reconnectAttemptsRef = useRef(0);
   const MAX_RECONNECT_ATTEMPTS = 5;
 
+  // 消息队列：连接未建立时暂存消息
+  const pendingQueueRef = useRef<Array<{type: string, payload: any}>>([]);
+
+  const flushPendingQueue = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    while (pendingQueueRef.current.length > 0) {
+      const msg = pendingQueueRef.current.shift();
+      if (!msg) continue;
+      const message = {
+        type: msg.type,
+        payload: msg.payload,
+        timestamp: Date.now(),
+        message_id: crypto.randomUUID()
+      };
+      try {
+        wsRef.current.send(JSON.stringify(message));
+        console.log('[WebSocket] Flushed queued:', msg.type);
+      } catch (e) {
+        console.error('[WebSocket] Failed to flush queued message:', e);
+        pendingQueueRef.current.unshift(msg);
+        break;
+      }
+    }
+  }, []);
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
@@ -39,6 +64,8 @@ export function useWebSocket() {
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
+        // 发送队列中暂存的消息
+        flushPendingQueue();
       };
 
       ws.onmessage = (event) => {
@@ -98,8 +125,10 @@ export function useWebSocket() {
       wsRef.current.send(JSON.stringify(message));
       return true;
     } else {
-      console.warn('[WebSocket] Not connected, message dropped:', type);
-      return false;
+      // 连接未建立时，消息入队
+      pendingQueueRef.current.push({ type, payload });
+      console.warn('[WebSocket] Not connected, message queued:', type, `queue_size=${pendingQueueRef.current.length}`);
+      return true;
     }
   }, []);
 

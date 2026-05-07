@@ -210,6 +210,22 @@ export function RealtimeProvider({ children }: Props) {
         break;
       }
 
+      case 'html_snapshot': {
+        const { stepId: htmlStepId, html, url, title } = msg.payload || {};
+        console.log('[RealtimeProvider] HTML snapshot received for step:', htmlStepId, 'url:', url);
+        if (html && htmlStepId) {
+          const store = useBlueprintStore.getState();
+          store.addHtmlSnapshot?.({
+            stepId: htmlStepId,
+            html,
+            url: url || '',
+            title: title || '',
+            timestamp: Date.now(),
+          });
+        }
+        break;
+      }
+
       case 'error':
         console.error('[RealtimeProvider] Server error:', msg.payload?.message || msg.error);
         break;

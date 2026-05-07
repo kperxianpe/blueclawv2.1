@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_0d7bd17c",
+    "user_input": "Say hello",
+    "status": "EXECUTING",
+    "created_at": 1777199537.85864,
+    "updated_at": 1777199542.4579234,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-26T18:32:22.457927",
+  "version": 1
+}

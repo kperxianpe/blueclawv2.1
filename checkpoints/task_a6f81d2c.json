@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_a6f81d2c",
+    "user_input": "ta教程",
+    "status": "created",
+    "created_at": 1777406588.1963077,
+    "updated_at": 1777406588.1963077,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-29T04:03:08.196386",
+  "version": 1
+}

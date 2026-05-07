@@ -9,8 +9,10 @@ import {
   type Edge,
   type NodeTypes,
 } from '@xyflow/react';
-import { X, Play, Info, Layers } from 'lucide-react';
+import { X, Play, Info, Layers, Camera, Globe, Code } from 'lucide-react';
+import { LiveIDE } from './LiveIDE';
 import { cn } from '@/lib/utils';
+import { useBlueprintStore } from '@/store/useBlueprintStore';
 import type { ToolItem } from './ToolDock';
 
 interface VisualAdapterProps {
@@ -21,6 +23,88 @@ interface VisualAdapterProps {
 
 interface OpenedItem extends ToolItem {
   openedAt: number;
+}
+
+// 实时截图组件
+function LiveScreenshots() {
+  const screenshots = useBlueprintStore((s) => s.screenshots);
+  if (screenshots.length === 0) return null;
+
+  const latest = screenshots[screenshots.length - 1];
+
+  return (
+    <div className="absolute bottom-2 left-2 right-2 z-50">
+      <div className="bg-slate-900/90 border border-white/10 rounded-lg overflow-hidden">
+        <div className="flex items-center gap-2 px-2 py-1 bg-slate-800/80 border-b border-white/10">
+          <Camera className="w-3 h-3 text-green-400" />
+          <span className="text-[10px] text-white/80">Adapter 实时画面</span>
+          <span className="text-[10px] text-white/40 ml-auto">{screenshots.length} 张</span>
+        </div>
+        <div className="p-2">
+          <img
+            src={`data:image/png;base64,${latest.image}`}
+            alt="screenshot"
+            className="w-full h-auto rounded border border-white/10"
+            style={{ maxHeight: '180px', objectFit: 'contain' }}
+          />
+          <p className="text-[10px] text-white/40 mt-1 truncate">步骤: {latest.stepId}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 极简浏览器组件 —— 用 iframe 渲染 Adapter 抓到的真实网页 HTML
+function LiveBrowser() {
+  const htmlSnapshots = useBlueprintStore((s) => s.htmlSnapshots);
+  const screenshots = useBlueprintStore((s) => s.screenshots);
+
+  // 优先显示 HTML 快照，没有则 fallback 到截图
+  if (htmlSnapshots.length === 0) {
+    return <LiveScreenshots />;
+  }
+
+  const latest = htmlSnapshots[htmlSnapshots.length - 1];
+
+  // 注入 base 标签让相对路径资源尽量能加载
+  const htmlWithBase = latest.html.replace(
+    /<head>/i,
+    `<head><base href="${latest.url || 'about:blank'}" target="_blank">`
+  );
+
+  return (
+    <div className="absolute inset-2 z-50 flex flex-col">
+      <div className="flex-1 bg-white rounded-lg overflow-hidden border border-white/20 shadow-2xl flex flex-col">
+        {/* 浏览器标题栏 */}
+        <div className="flex items-center gap-2 px-3 py-2 bg-slate-800 border-b border-white/10 flex-shrink-0">
+          <div className="flex gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+            <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+            <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+          </div>
+          <span className="text-[11px] text-white/70 truncate flex-1 text-center">
+            {latest.title || 'Adapter 浏览器'} — {latest.url || ''}
+          </span>
+          <span className="text-[10px] text-white/40">{htmlSnapshots.length} 帧</span>
+        </div>
+
+        {/* iframe 渲染区域 */}
+        <iframe
+          srcDoc={htmlWithBase}
+          title="adapter-browser"
+          className="flex-1 w-full border-0"
+          sandbox="allow-same-origin allow-scripts"
+        />
+
+        {/* 底部信息 */}
+        <div className="px-2 py-1 bg-slate-800/90 border-t border-white/10 flex-shrink-0">
+          <p className="text-[10px] text-white/40 truncate">
+            步骤: {latest.stepId} | HTML: {latest.html.length.toLocaleString()} 字符
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Vis节点组件
@@ -78,6 +162,7 @@ export function VisualAdapter({ droppedItems, onItemUse, onEdit }: VisualAdapter
   const [openedItems, setOpenedItems] = useState<OpenedItem[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<ToolItem | null>(null);
+  const [activeMode, setActiveMode] = useState<'canvas' | 'web' | 'ide'>('canvas');
   
   // ReactFlow状态
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -168,6 +253,42 @@ export function VisualAdapter({ droppedItems, onItemUse, onEdit }: VisualAdapter
       <div className="flex items-center gap-1 px-2 py-2 bg-slate-900/60 border-b border-white/10 overflow-x-auto">
         <span className="text-xs text-white/60 mr-2 flex-shrink-0">vis-adapter</span>
         
+        {/* 模式切换按钮 */}
+        <div className="flex items-center gap-1 mr-3">
+          <button
+            onClick={() => setActiveMode('canvas')}
+            className={cn(
+              "flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-all",
+              activeMode === 'canvas' ? "bg-white/20 text-white" : "bg-white/5 text-white/50 hover:bg-white/10"
+            )}
+          >
+            <Layers className="w-3 h-3" />
+            画布
+          </button>
+          <button
+            onClick={() => setActiveMode('web')}
+            className={cn(
+              "flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-all",
+              activeMode === 'web' ? "bg-white/20 text-white" : "bg-white/5 text-white/50 hover:bg-white/10"
+            )}
+          >
+            <Globe className="w-3 h-3" />
+            Web
+          </button>
+          <button
+            onClick={() => setActiveMode('ide')}
+            className={cn(
+              "flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-all",
+              activeMode === 'ide' ? "bg-white/20 text-white" : "bg-white/5 text-white/50 hover:bg-white/10"
+            )}
+          >
+            <Code className="w-3 h-3" />
+            IDE
+          </button>
+        </div>
+        
+        <div className="w-px h-4 bg-white/10 mx-1" />
+        
         {openedItems.map((item) => (
           <button
             key={item.id}
@@ -222,12 +343,12 @@ export function VisualAdapter({ droppedItems, onItemUse, onEdit }: VisualAdapter
             <Controls className="bg-slate-800/80 border border-white/20" />
           </ReactFlow>
           
-          {/* 拖放覆盖层 - 处理拖放事件 */}
+          {/* 拖放覆盖层 - 处理拖放事件，默认不拦截点击 */}
           <div 
-            className="absolute inset-0 z-50"
+            className="absolute inset-0 z-30"
             onDragOver={handleDragOver}
             onDrop={handleDrop}
-            style={{ pointerEvents: 'auto' }}
+            style={{ pointerEvents: 'none' }}
           />
           
           {/* 空状态提示 */}
@@ -240,6 +361,10 @@ export function VisualAdapter({ droppedItems, onItemUse, onEdit }: VisualAdapter
               </div>
             </div>
           )}
+          
+          {/* 模式覆盖层 */}
+          {activeMode === 'web' && <LiveBrowser />}
+          {activeMode === 'ide' && <LiveIDE files={[]} />}
         </div>
 
         {/* 右侧：详情面板 */}

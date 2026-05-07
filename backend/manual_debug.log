@@ -1,0 +1,21 @@
+[Main] Loaded .env from /root/.openclaw/workspace/blueclawv2.1/.env
+[Main] KIMI_API_KEY set: Yes
+[VMS] Warning: PIL/pyautogui not available, using mock mode
+[MPL] Warning: pyautogui not available, using mock mode
+[MCP] SDK not available, using mock mode
+[MCP] Loaded config from backend/config/mcp_servers.json
+[MCP] SDK not available, using mock mode
+[MCP] Loaded config from backend/config/mcp_servers.json
+[Main] TaskManager and MessageRouter server references set
+[Main] Starting Blueclaw v2.5 Unified Server on port 8006
+[Main]   HTTP REST: http://localhost:8006/api/ide/*
+[Main]   WS Main  : ws://localhost:8006/ws
+[Main]   WS IDE   : ws://localhost:8006/ws/ide
+INFO:     Started server process [671720]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://localhost:8006 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [671720]

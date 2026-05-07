@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_adafc5d6",
+    "user_input": "帮我搜索无人机产品",
+    "status": "EXECUTING",
+    "created_at": 1777375149.319114,
+    "updated_at": 1777375171.10591,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-28T19:19:31.105915",
+  "version": 1
+}

@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_4e48566d",
+    "user_input": "Open baidu.com and search AI",
+    "status": "EXECUTING",
+    "created_at": 1777199537.8925385,
+    "updated_at": 1777199542.8150847,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-26T18:32:22.815088",
+  "version": 1
+}

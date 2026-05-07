@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_2513ee89",
+    "user_input": "帮我查一下最新的无人机产品",
+    "status": "created",
+    "created_at": 1777357116.7740152,
+    "updated_at": 1777357116.7740152,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-28T14:18:36.774067",
+  "version": 1
+}

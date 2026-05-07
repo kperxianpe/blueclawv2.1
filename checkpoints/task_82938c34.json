@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_82938c34",
+    "user_input": "timeout test",
+    "status": "created",
+    "created_at": 1777317426.9820354,
+    "updated_at": 1777317426.9820354,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-28T03:17:06.982057",
+  "version": 1
+}

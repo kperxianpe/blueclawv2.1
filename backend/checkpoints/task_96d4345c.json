@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_96d4345c",
+    "user_input": "打开百度首页，搜索'Blueclaw'并截图",
+    "status": "EXECUTING",
+    "created_at": 1777199496.0512054,
+    "updated_at": 1777199501.1832445,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-26T18:31:41.183249",
+  "version": 1
+}

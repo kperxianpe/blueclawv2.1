@@ -8,7 +8,7 @@ interface InputScreenProps {
 }
 
 const quickExamples = [
-  { text: '规划杭州2日游', icon: MapPin },
+  { text: '帮我规划北京3日游', icon: MapPin },
   { text: '写Python脚本', icon: Code },
 ];
 

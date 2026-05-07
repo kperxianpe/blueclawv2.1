@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_dbb93a37",
+    "user_input": "技术美术教程",
+    "status": "EXECUTING",
+    "created_at": 1777458031.3216624,
+    "updated_at": 1777458069.8121998,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-29T18:21:09.812218",
+  "version": 1
+}

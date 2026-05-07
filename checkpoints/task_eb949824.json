@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_eb949824",
+    "user_input": "去CSDN搜索ta教程",
+    "status": "created",
+    "created_at": 1777387392.6621323,
+    "updated_at": 1777387392.6621323,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-28T22:43:40.961047",
+  "version": 1
+}

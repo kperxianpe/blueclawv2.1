@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_f1aff749",
+    "user_input": "帮我查一下Python教程",
+    "status": "EXECUTING",
+    "created_at": 1777466928.9143329,
+    "updated_at": 1777466952.1805923,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-29T20:49:12.180638",
+  "version": 1
+}

@@ -9,8 +9,9 @@ import {
   type Edge,
   type NodeTypes,
 } from '@xyflow/react';
-import { X, Play, Info, Layers } from 'lucide-react';
+import { X, Play, Info, Layers, Camera } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useBlueprintStore } from '@/store/useBlueprintStore';
 import type { ToolItem } from './ToolDock';
 
 interface VisualAdapterProps {
@@ -21,6 +22,35 @@ interface VisualAdapterProps {
 
 interface OpenedItem extends ToolItem {
   openedAt: number;
+}
+
+// 实时截图组件
+function LiveScreenshots() {
+  const screenshots = useBlueprintStore((s) => s.screenshots);
+  if (screenshots.length === 0) return null;
+  
+  const latest = screenshots[screenshots.length - 1];
+  
+  return (
+    <div className="absolute bottom-2 left-2 right-2 z-50">
+      <div className="bg-slate-900/90 border border-white/10 rounded-lg overflow-hidden">
+        <div className="flex items-center gap-2 px-2 py-1 bg-slate-800/80 border-b border-white/10">
+          <Camera className="w-3 h-3 text-green-400" />
+          <span className="text-[10px] text-white/80">Adapter 实时画面</span>
+          <span className="text-[10px] text-white/40 ml-auto">{screenshots.length} 张</span>
+        </div>
+        <div className="p-2">
+          <img
+            src={`data:image/png;base64,${latest.image}`}
+            alt="screenshot"
+            className="w-full h-auto rounded border border-white/10"
+            style={{ maxHeight: '180px', objectFit: 'contain' }}
+          />
+          <p className="text-[10px] text-white/40 mt-1 truncate">步骤: {latest.stepId}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Vis节点组件
@@ -240,6 +270,9 @@ export function VisualAdapter({ droppedItems, onItemUse, onEdit }: VisualAdapter
               </div>
             </div>
           )}
+          
+          {/* 实时截图显示 */}
+          <LiveScreenshots />
         </div>
 
         {/* 右侧：详情面板 */}

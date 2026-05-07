@@ -42,6 +42,41 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const messagesRef = useRef<WebSocketMessage[]>([]);
   const consumedIndexRef = useRef(0);
 
+  const disconnect = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+  }, []);
+
+  // 消息队列：连接未建立时暂存消息
+  const pendingQueueRef = useRef<Array<{type: string, payload: any}>>([]);
+
+  const flushPendingQueue = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    while (pendingQueueRef.current.length > 0) {
+      const msg = pendingQueueRef.current.shift();
+      if (!msg) continue;
+      const message = {
+        type: msg.type,
+        payload: msg.payload,
+        timestamp: Date.now(),
+        message_id: crypto.randomUUID()
+      };
+      try {
+        wsRef.current.send(JSON.stringify(message));
+        console.log('[WebSocketContext] Flushed queued:', msg.type);
+      } catch (e) {
+        console.error('[WebSocketContext] Failed to flush queued message:', e);
+        pendingQueueRef.current.unshift(msg);
+        break;
+      }
+    }
+  }, []);
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
@@ -61,6 +96,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         if (typeof window !== 'undefined') {
           (window as any).__WEBSOCKET_INSTANCE__ = ws;
         }
+        // 发送队列中暂存的消息
+        flushPendingQueue();
       };
 
       ws.onmessage = (event) => {
@@ -97,17 +134,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       console.error('[WebSocketContext] Failed to connect:', e);
       setError('Failed to create WebSocket connection');
     }
-  }, []);
-
-  const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-  }, []);
+  }, [flushPendingQueue]);
 
   const consumeMessages = useCallback(() => {
     const newMessages = messagesRef.current.slice(consumedIndexRef.current);
@@ -127,8 +154,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       wsRef.current.send(JSON.stringify(message));
       return true;
     } else {
-      console.warn('[WebSocketContext] Not connected, message dropped:', type);
-      return false;
+      // 连接未建立时，消息入队
+      pendingQueueRef.current.push({ type, payload });
+      console.warn('[WebSocketContext] Not connected, message queued:', type, `queue_size=${pendingQueueRef.current.length}`);
+      return true;  // 返回 true 让调用方知道消息已接收（稍后发送）
     }
   }, []);
 

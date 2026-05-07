@@ -1,0 +1,14 @@
+{
+  "task": {
+    "id": "task_93515616",
+    "user_input": "搜索无人机视频",
+    "status": "EXECUTING",
+    "created_at": 1777208138.2809231,
+    "updated_at": 1777208158.8122187,
+    "thinking_path": [],
+    "execution_blueprint": null,
+    "current_step_id": null
+  },
+  "saved_at": "2026-04-26T20:55:58.812223",
+  "version": 1
+}
